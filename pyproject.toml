@@ -1,0 +1,24 @@
+[project]
+name = "tool-chat"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "ddgs>=9.6.1",
+    "fastapi>=0.120.0",
+    "httpx>=0.28.1",
+    "instructor>=1.11.3",
+    "langchain>=1.0.2",
+    "langchain-community>=0.4",
+    "langchain-core>=1.0.0",
+    "langchain-openai>=1.0.1",
+    "langchain-qdrant>=1.1.0",
+    "langchain-tavily>=0.2.12",
+    "langgraph>=1.0.1",
+    "omegaconf>=2.3.0",
+    "pydantic-settings>=2.11.0",
+    "rich>=14.2.0",
+    "streamlit>=1.41.1",
+    "uvicorn>=0.38.0",
+]
