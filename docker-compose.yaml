@@ -5,18 +5,17 @@ services:
     env_file:
       - .env
     environment:
-      # Scoped env vars for LangGraph DB
       - POSTGRES_USER=${POSTGRES_USER:-langgraph}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-langgraph}
       - POSTGRES_DB=${POSTGRES_DB:-langgraph}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
 
-      # API database name for init script
-      - API_DB_NAME=${API_DB_NAME:-bikerental_api}
+      - API_DB_NAME=${API_DB_NAME:-user_feedback_db}
     ports:
-      - "5432:5432" # Expose DB to host on port 5433
+      - "5432:5432"
     volumes:
       - langgraph-db-volume:/var/lib/postgresql/data
+
       # Mount initialization script to create API database or other needed DBs
       - ./docker/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
     healthcheck:
@@ -29,3 +28,6 @@ services:
 
 volumes:
   langgraph-db-volume:
+
+networks:
+  default:

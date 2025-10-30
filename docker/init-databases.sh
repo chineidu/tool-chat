@@ -5,7 +5,7 @@ set -e
 # It runs automatically when the container is initialized
 
 # Get API database name from environment variable or use default
-API_DB_NAME="${API_DB_NAME:-user_feedback}"
+API_DB_NAME="${API_DB_NAME:-user_feedback_db}"
 
 echo "🔧 Initializing databases..."
 echo "  - Main DB: ${POSTGRES_DB}"

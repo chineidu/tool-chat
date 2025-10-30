@@ -81,20 +81,20 @@ class Settings(BaseSettingsConfig):
 
     # ===== DATABASE =====
     POSTGRES_USER: str = "langgraph"
-    POSTGRES_PASSWORD: SecretStr = SecretStr("")
+    POSTGRES_PASSWORD: SecretStr = SecretStr("your_postgres_password")
     POSTGRES_DB: str = "langgraph"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
 
-    API_DB_NAME: str = "user_feedback"
+    API_DB_NAME: str = "user_feedback_db"
 
     # ===== REMOTE INFERENCE =====
     # GROQ
-    GROQ_API_KEY: SecretStr = SecretStr("")
+    GROQ_API_KEY: SecretStr = SecretStr("your_groq_api_key")
     GROQ_URL: str = "https://api.groq.com/openai/v1"
 
     # OPENROUTER
-    OPENROUTER_API_KEY: SecretStr = SecretStr("")
+    OPENROUTER_API_KEY: SecretStr = SecretStr("your_openrouter_api_key")
     OPENROUTER_URL: str = "https://openrouter.ai/api/v1"
 
     # TAVILY
@@ -102,8 +102,8 @@ class Settings(BaseSettingsConfig):
 
     # ===== OBSERVABILITY =====
     # LANGFUSE
-    LANGFUSE_SECRET_KEY: SecretStr = SecretStr("")
-    LANGFUSE_PUBLIC_KEY: SecretStr = SecretStr("")
+    LANGFUSE_SECRET_KEY: SecretStr = SecretStr("your_langfuse_secret_key")
+    LANGFUSE_PUBLIC_KEY: SecretStr = SecretStr("your_langfuse_public_key")
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
 
     @field_validator("POSTGRES_PORT", mode="before")
@@ -141,6 +141,29 @@ class Settings(BaseSettingsConfig):
             f"@{self.POSTGRES_HOST}"
             f":{self.POSTGRES_PORT}"
             f"/{self.POSTGRES_DB}"
+        )
+        return fix_url_credentials(url)
+
+    @property
+    def database_url_2(self) -> str:
+        """
+        Constructs the API database connection URL.
+
+        This is the database used for user authentication and API-specific tables.
+        It's separate from MLflow's database to avoid conflicts.
+
+        Returns
+        -------
+        str
+            Complete database connection URL in the format:
+            postgresql+psycopg2://user:password@host:port/dbname
+        """
+        url: str = (
+            f"postgresql+psycopg2://{self.POSTGRES_USER}"
+            f":{self.POSTGRES_PASSWORD.get_secret_value()}"
+            f"@{self.POSTGRES_HOST}"
+            f":{self.POSTGRES_PORT}"
+            f"/{self.API_DB_NAME}"
         )
         return fix_url_credentials(url)
 

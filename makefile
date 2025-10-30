@@ -54,10 +54,40 @@ format:
 	uv run ruff check --fix .
 	uv run ruff format .
 
-clean:
+clean-cache:
 	@echo "🧹 Cleaning up..."
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "✅ Cleanup complete"
+
+.PHONY: up down restart logs clean setup
+
+# Start all services
+up:
+	@chmod +x docker/init-databases.sh
+	docker-compose up -d
+
+# Stop all services
+down:
+	docker-compose down
+
+# Restart services
+restart: down up
+
+# Clean everything (including volumes)
+clean-all:
+	docker-compose down -v --remove-orphans
+
+# View logs
+logs:
+	docker-compose logs -f
+
+# Setup from scratch
+setup: clean up
+	@echo "Setup complete! Services are running."
+
+# Check status
+status:
+	docker-compose ps
