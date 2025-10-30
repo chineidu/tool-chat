@@ -2,15 +2,15 @@ import json
 from typing import Any, AsyncGenerator, LiteralString
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, HumanMessage
 
-from src.logic.graph import build_graph
+from src.api import get_graph_manager
+from src.logic.graph import GraphManager
 from src.schemas.types import Events
 
 router = APIRouter(tags=["streamer"])
-graph = build_graph()
 
 
 def serialise_ai_message_chunk(
@@ -25,9 +25,11 @@ def serialise_ai_message_chunk(
 
 
 async def generate_chat_responses(
-    message: str, checkpoint_id: str | None = None
+    message: str, graph_manager: GraphManager, checkpoint_id: str | None = None
 ) -> AsyncGenerator[str | LiteralString, Any]:
     """Generate chat responses as a stream of Server-Sent Events (SSE)."""
+
+    graph = await graph_manager.build_graph()
     # ==========================================================
     # ==================== New Conversation ====================
     # ==========================================================
@@ -140,10 +142,12 @@ async def generate_chat_responses(
 
 @router.get("/chat_stream")
 async def chat_stream(
-    message: str, checkpoint_id: str | None = None
+    message: str,
+    graph_manager: GraphManager = Depends(get_graph_manager),
+    checkpoint_id: str | None = None,
 ) -> StreamingResponse:
     """Endpoint to stream chat responses for a given message."""
     return StreamingResponse(
-        content=generate_chat_responses(message, checkpoint_id),
+        content=generate_chat_responses(message, graph_manager, checkpoint_id),
         media_type="text/event-stream",
     )

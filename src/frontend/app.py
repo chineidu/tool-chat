@@ -358,13 +358,13 @@ def main() -> None:
         <style>
         /* Force light theme with soft colors */
         .stApp {
-            background-color: #f5f5f5;
+            background-color: #B9D9EB;
             color: #000000;
         }
 
         /* Main content area - soft light gray */
         .main {
-            background-color: #f5f5f5;
+            background-color: #B9D9EB;
             color: #000000;
         }
 
@@ -384,12 +384,52 @@ def main() -> None:
 
         /* Sidebar - light gray with dark text */
         [data-testid="stSidebar"] {
-            background-color: #e8e8e8;
+            background-color: #B9D9EB;
             border-right: 1px solid #cbd5e0;
         }
 
         [data-testid="stSidebar"] * {
             color: #000000 !important;
+        }
+
+        /* Buttons inside the sidebar may inherit global text color; force high-contrast
+           styling so dark button backgrounds keep readable text and icons. */
+        [data-testid="stSidebar"] .stButton > button,
+        [data-testid="stSidebar"] .stButton button,
+        [data-testid="stSidebar"] button.stButton,
+        [data-testid="stSidebar"] .stButton {
+            background-color: #23272f !important;
+            color: #ffffff !important; /* force white text for legibility */
+            -webkit-text-fill-color: #ffffff !important;
+            border: 2px solid #23272f !important;
+            box-shadow: none !important;
+            font-weight: 600 !important;
+        }
+
+        /* Ensure any nested spans, icons or children also inherit the white color */
+        [data-testid="stSidebar"] .stButton * {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+        }
+
+        /* Force SVG/icon fills to white so emoji-like icons or svg icons are legible */
+        [data-testid="stSidebar"] .stButton svg path,
+        [data-testid="stSidebar"] .stButton svg {
+            fill: #ffffff !important;
+            stroke: #ffffff !important;
+        }
+
+        [data-testid="stSidebar"] .stButton > button:hover,
+        [data-testid="stSidebar"] .stButton:hover {
+            background-color: #343843 !important;
+            border-color: #343843 !important;
+            color: #ffffff !important;
+        }
+
+        [data-testid="stSidebar"] .stButton > button:focus,
+        [data-testid="stSidebar"] .stButton:focus {
+            outline: none !important;
+            box-shadow: 0 0 0 4px rgba(44,82,130,0.08) !important;
         }
 
         [data-testid="stSidebar"] .stMarkdown {
@@ -460,7 +500,7 @@ def main() -> None:
 
         /* Assistant avatar background - light gray for visibility */
         [data-testid="chatAvatarIcon-🤖"] {
-            background-color: #e8e8e8 !important;
+            background-color: #B9D9EB !important;
             color: #23272f !important;
         }
 
@@ -484,7 +524,7 @@ def main() -> None:
 
         /* Info/Success messages - soft gray with black text */
         .stAlert {
-            background-color: #e8e8e8;
+            background-color: #B9D9EB;
             border-radius: 8px;
             border-left: 4px solid #2c5282;
             color: #000000;
@@ -500,27 +540,32 @@ def main() -> None:
             border-radius: 0px;
             color: #000000;
             background-color: #ffffff;
+            /* Ensure the caret is visible */
+            caret-color: #2c5282 !important;
+            -webkit-text-fill-color: #000000 !important;
         }
 
         .stTextInput input:focus {
             border-color: #2c5282;
             background-color: #ffffff;
+            outline: none !important;
+            box-shadow: 0 0 0 3px rgba(44, 82, 130, 0.08) !important;
         }
 
         /* Chat input container - simple design */
         [data-testid="stChatInput"] {
             border-top: 2px solid #cbd5e0;
-            background-color: #f5f5f5 !important;
+            background-color: #B9D9EB !important;
         }
 
         /* Force bottom container background */
         [data-testid="stBottom"] {
-            background-color: #f5f5f5 !important;
+            background-color: #B9D9EB !important;
         }
 
         /* Chat input wrapper */
         [data-testid="stChatInput"] > div {
-            background-color: #f5f5f5 !important;
+            background-color: #B9D9EB !important;
         }
 
         [data-testid="stChatInput"] textarea {
@@ -528,33 +573,38 @@ def main() -> None:
             background-color: #ffffff !important;
             border: 2px solid #cbd5e0 !important;
             border-radius: 0px !important;
+            /* Make caret visible and ensure webkit text fill is set */
+            caret-color: #2c5282 !important;
+            -webkit-text-fill-color: #000000 !important;
         }
 
         [data-testid="stChatInput"] textarea:focus {
             border-color: #4C516D !important;
+            outline: none !important;
+            box-shadow: 0 0 0 3px rgba(76, 81, 109, 0.08) !important;
         }
 
         /* Bottom bar and all its children */
         .stChatFloatingInputContainer {
-            background-color: #f5f5f5 !important;
+            background-color: #B9D9EB !important;
         }
 
         [data-testid="stChatInputContainer"] {
-            background-color: #f5f5f5 !important;
+            background-color: #B9D9EB !important;
         }
 
         /* Footer area */
         footer {
-            background-color: #f5f5f5 !important;
+            background-color: #B9D9EB !important;
         }
 
         footer * {
-            background-color: #f5f5f5 !important;
+            background-color: #B9D9EB !important;
         }
 
         /* Expander (for sources) */
         .streamlit-expanderHeader {
-            background-color: #f5f5f5;
+            background-color: #B9D9EB;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             color: #000000;

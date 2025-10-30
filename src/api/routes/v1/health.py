@@ -2,13 +2,11 @@ from fastapi import APIRouter, status
 
 from src import create_logger
 from src.config import app_config
-from src.logic.graph import build_graph
 from src.schemas import HealthStatusSchema
 
 logger = create_logger(name="status_route")
 
 router = APIRouter(tags=["health"])
-graph = build_graph()
 
 
 @router.get("/health", status_code=status.HTTP_200_OK)

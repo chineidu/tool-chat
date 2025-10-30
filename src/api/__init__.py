@@ -8,6 +8,7 @@ from typing import Any, AsyncGenerator
 from fastapi import FastAPI, HTTPException, Request, status
 
 from src import create_logger
+from src.logic.graph import GraphManager
 
 warnings.filterwarnings("ignore")
 logger = create_logger(name="api_utilities")
@@ -30,6 +31,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
         # ===================================================
         # ================= Load model here =================
         # ===================================================
+
+        # Initialize GraphManager with Postgres checkpointer for LangGraph
+        app.state.graph_manager = GraphManager()
+        await app.state.graph_manager.initialize_checkpointer()
 
         await asyncio.sleep(1)  # Simulate async model loading
         app.state.my_model = {"dummy": "model"}  # Placeholder for model instance
@@ -55,6 +60,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
             except Exception as e:
                 logger.error(f"Error during shutdown cleanup: {e}")
 
+        # Cleanup Postgres checkpointer
+        if hasattr(app.state, "graph_manager"):
+            try:
+                await app.state.graph_manager.cleanup_checkpointer()
+                logger.info("Postgres checkpointer cleaned up during shutdown")
+            except Exception as e:
+                logger.error(f"Error cleaning up checkpointer: {e}")
+
 
 def get_model_manager(request: Request) -> dict[str, Any]:
     """Get the prediction service from the app state."""
@@ -64,3 +77,16 @@ def get_model_manager(request: Request) -> dict[str, Any]:
             detail="Prediction service not loaded. Please try again later.",
         )
     return request.app.state.my_model
+
+
+def get_graph_manager(request: Request) -> GraphManager:
+    """Get the GraphManager from the app state."""
+    if (
+        not hasattr(request.app.state, "graph_manager")
+        or request.app.state.graph_manager is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Graph manager not loaded. Please try again later.",
+        )
+    return request.app.state.graph_manager

@@ -61,7 +61,7 @@ llm = ChatOpenAI(
     base_url=llm_model_creds[1],  # type: ignore
     temperature=0.0,
     model=llm_model_name,  # type: ignore
-).bind(max_tokens=MAX_CREATIVE_TOKENS)
+)
 summarization_llm = ChatOpenAI(
     api_key=summarization_llm_creds[0],  # type: ignore
     base_url=summarization_llm_creds[1],  # type: ignore
@@ -85,7 +85,9 @@ async def llm_call_node(state: State) -> State:
 
     _msg = query_prompt.format(query=state.get("query", ""))
     query = HumanMessage(content=_msg)
-    llm_with_tools = llm.bind_tools(tools=[search_tool, date_and_time_tool])
+    llm_with_tools = llm.bind_tools(
+        tools=[search_tool, date_and_time_tool],
+    ).bind(max_tokens=MAX_CREATIVE_TOKENS)
     response = await llm_with_tools.ainvoke([sys_msg] + msgs_with_summary + [query])
 
     return State(

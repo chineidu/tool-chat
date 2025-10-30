@@ -1,20 +1,22 @@
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from langchain_core.messages import BaseMessage
 
 from src import create_logger
-from src.logic.graph import build_graph
+from src.api import get_graph_manager
+from src.logic.graph import GraphManager
 from src.schemas import ChatHistorySchema
 
 logger = create_logger(name="status_route")
 
 router = APIRouter(tags=["history"])
-graph = build_graph()
 
 
 @router.get("/chat_history", status_code=status.HTTP_200_OK)
-async def get_chat_history(checkpoint_id: str) -> ChatHistorySchema:
+async def get_chat_history(
+    checkpoint_id: str, graph_manager: GraphManager = Depends(get_graph_manager)
+) -> ChatHistorySchema:
     """
     Retrieve the conversation history for a given checkpoint ID.
 
@@ -30,9 +32,10 @@ async def get_chat_history(checkpoint_id: str) -> ChatHistorySchema:
     """
     try:
         config: dict[str, Any] = {"configurable": {"thread_id": checkpoint_id}}
+        graph = await graph_manager.build_graph()
 
         # Get the state from the checkpoint
-        state = graph.get_state(config)  # type: ignore
+        state = await graph.aget_state(config)  # type: ignore
 
         if not state or not state.values or not state.values.get("messages"):
             logger.error(f"Checkpoint '{checkpoint_id}' not found or has no messages")
