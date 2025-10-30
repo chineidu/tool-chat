@@ -1,0 +1,26 @@
+services:
+  # PostgreSQL for LangGraph
+  langgraph-db:
+    image: postgres:17.5-bookworm
+    env_file:
+      - .env
+    environment:
+      # Scoped env vars for LangGraph DB
+      - POSTGRES_USER=${POSTGRES_USER:-langgraph}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-langgraph}
+      - POSTGRES_DB=${POSTGRES_DB:-langgraph}
+      # API database name for init script
+      - API_DB_NAME=${API_DB_NAME:-bikerental_api}
+    ports:
+      - "5433:5432" # Expose DB to host on port 5433
+    volumes:
+      - langgraph-db-volume:/var/lib/postgresql/data
+      # Mount initialization script to create API database or other needed DBs
+      - ./docker/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:-langgraph}"]
+      interval: 5s
+      retries: 5
+    networks:
+      - default
+    restart: unless-stopped

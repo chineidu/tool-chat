@@ -2,7 +2,7 @@ import logging
 import sys
 from pathlib import Path
 
-PACKAGE_PATH = Path(__file__).parent.resolve()
+PACKAGE_PATH = Path(__file__).parent.parent.absolute()
 
 
 def create_logger(
@@ -57,4 +57,4 @@ def create_logger(
     return logger
 
 
-__all__: list[str] = ["create_logger"]
+__all__: list[str] = ["PACKAGE_PATH", "create_logger"]
