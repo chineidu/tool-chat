@@ -63,9 +63,9 @@ class TestUserCRUD:
     def test_create_user_duplicate_email(self, db_session: Session) -> None:
         """Test creating a user with duplicate email raises ValueError."""
         user_data = UserWithHashSchema(
-            firstname="Johnny",
+            firstname="Neidu",
             lastname="Doey",
-            username="johndoe_duplicate",
+            username="neidu_doe_duplicate",
             email="duplicate@example.com",
             hashed_password="hashed_password_123",
         )
@@ -173,16 +173,16 @@ class TestFeedbackCRUD:
         """Test creating feedback successfully."""
         # First create a user
         user_data = UserWithHashSchema(
-            firstname="David",
-            lastname="Miller",
-            username="davidmiller",
-            email="david.miller@example.com",
+            firstname="chinedu",
+            lastname="Manuel",
+            username="chinedu_manuel",
+            email="chinedu.manuel@example.com",
             hashed_password="hashed_password_303",
         )
         user = create_user(db_session, user_data)
 
         feedback_data = FeedbackRequestSchema(
-            user_name="davidmiller",
+            username="chinedu_manuel",
             user_id=user.id,
             session_id="session123",
             message_index=1,
@@ -195,7 +195,7 @@ class TestFeedbackCRUD:
         feedback = create_feedback(db_session, feedback_data)
 
         assert feedback is not None
-        assert feedback.user_name == "davidmiller"
+        assert feedback.username == "chinedu_manuel"
         assert feedback.session_id == "session123"
         assert feedback.message_index == 1
         assert feedback.user_message == "What is AI?"
@@ -216,7 +216,7 @@ class TestFeedbackCRUD:
         user = create_user(db_session, user_data)
 
         feedback_data = FeedbackRequestSchema(
-            user_name="johndoe_feedback",
+            username="johndoe_feedback",
             user_id=user.id,
             session_id="session456",
             message_index=1,
@@ -234,7 +234,7 @@ class TestFeedbackCRUD:
         assert retrieved_feedback.id == created_feedback.id
         assert retrieved_feedback.session_id == "session456"
         assert retrieved_feedback.message_index == 1
-        assert retrieved_feedback.user_name == "johndoe_feedback"
+        assert retrieved_feedback.username == "johndoe_feedback"
 
 
 class TestRoleCRUD:
@@ -295,9 +295,9 @@ class TestRoleCRUD:
         # Create user
         user_data = UserWithHashSchema(
             firstname="Frank",
-            lastname="Taylor",
-            username="frank_taylor",
-            email="frank.taylor@example.com",
+            lastname="Lamps",
+            username="frank_lamps",
+            email="frank.lamps@example.com",
             hashed_password="hashed_password_505",
         )
         user = create_user(db_session, user_data)
@@ -310,7 +310,7 @@ class TestRoleCRUD:
         role = create_role(db_session, role_data)
 
         # Assign role to user
-        assign_role_to_user(db_session, "frank_taylor", RoleType.USER)
+        assign_role_to_user(db_session, "frank_lamps", RoleType.USER)
 
         # Refresh user from database
         db_session.refresh(user)
@@ -337,25 +337,25 @@ class TestRoleCRUD:
         """Test assigning nonexistent role to user raises ValueError."""
         # Create user
         user_data = UserWithHashSchema(
-            firstname="Grace",
-            lastname="Lee",
-            username="gracelee",
-            email="grace.lee@example.com",
+            firstname="Kemi",
+            lastname="Ahmed",
+            username="kemiahmed",
+            email="kemi.ahmed@example.com",
             hashed_password="hashed_password_606",
         )
         create_user(db_session, user_data)
 
         with pytest.raises(ValueError, match="Role nonexistent does not exist"):
-            assign_role_to_user(db_session, "gracelee", "nonexistent")  # type: ignore
+            assign_role_to_user(db_session, "kemiahmed", "nonexistent")  # type: ignore
 
     def test_assign_role_to_user_already_assigned(self, db_session: Session) -> None:
         """Test assigning already assigned role doesn't duplicate."""
         # Create user
         user_data = UserWithHashSchema(
             firstname="Henry",
-            lastname="Clark",
-            username="henryclark",
-            email="henry.clark@example.com",
+            lastname="Obi",
+            username="henryobi",
+            email="henry.obi@example.com",
             hashed_password="hashed_password_707",
         )
         user = create_user(db_session, user_data)
@@ -368,10 +368,10 @@ class TestRoleCRUD:
         create_role(db_session, role_data)
 
         # Assign role first time
-        assign_role_to_user(db_session, "henryclark", RoleType.GUEST)
+        assign_role_to_user(db_session, "henryobi", RoleType.GUEST)
 
         # Assign same role again
-        assign_role_to_user(db_session, "henryclark", RoleType.GUEST)
+        assign_role_to_user(db_session, "henryobi", RoleType.GUEST)
 
         # Refresh user from database
         db_session.refresh(user)

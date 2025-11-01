@@ -54,7 +54,7 @@ class FeedbackRequestSchema(BaseModel):
         }
     )
 
-    user_name: str = Field(..., description="Username of the user providing feedback")
+    username: str = Field(..., description="Username of the user providing feedback")
     user_id: int = Field(..., description="ID of the user providing feedback")
     session_id: str = Field(..., description="Session/checkpoint ID")
     message_index: int = Field(

@@ -38,13 +38,13 @@ def get_user_by_id(db: Session, user_id: int) -> DBUser | None:
 
 
 def get_feedback_by_username(
-    db: Session, session_id: str, message_index: int, user_name: str
+    db: Session, session_id: str, message_index: int, username: str
 ) -> DBUserFeedback | None:
     """Get feedback by session ID, message index, and user name."""
     stmt = select(DBUserFeedback).where(
         DBUserFeedback.session_id == session_id,
         DBUserFeedback.message_index == message_index,
-        DBUserFeedback.user_name == user_name,
+        DBUserFeedback.username == username,
     )
     return db.scalar(stmt)
 

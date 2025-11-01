@@ -76,7 +76,7 @@ class DBUserFeedback(Base):
     __tablename__: str = "user_feedback"
 
     id: Mapped[int] = mapped_column("id", primary_key=True)
-    user_name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     session_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     message_index: Mapped[int] = mapped_column(Integer, nullable=False)
     # It can vary based on user input
