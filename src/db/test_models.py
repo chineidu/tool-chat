@@ -111,7 +111,9 @@ class Enrollment(Base):
     __tablename__: str = "enrollments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False)
+    matric_no: Mapped[str] = mapped_column(
+        ForeignKey("students.matric_no"), nullable=False
+    )
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), nullable=False)
     grade: Mapped[float] = mapped_column(nullable=True)
     registered_at: Mapped[datetime] = mapped_column(
@@ -128,7 +130,7 @@ class Enrollment(Base):
 
     # Ensure ONLY a single enrollment per student per course
     __table_args__: tuple[UniqueConstraint] = (
-        UniqueConstraint("student_id", "course_id", name="uix_student_course"),
+        UniqueConstraint("matric_no", "course_id", name="uix_student_course"),
     )
 
 

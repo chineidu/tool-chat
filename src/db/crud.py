@@ -1,320 +1,173 @@
 """
-CRUD operations for managing database entities.
-It uses SQLAlchemy ORM v2.xx style queries for efficiency and high performance.
+Crud operations for the database.
+
+(Using SQLAlchemy ORM v2.x)
 """
 
-from datetime import datetime
-from enum import Enum
+import json
+from typing import Any
 
-from pydantic import BaseModel, Field
-from sqlalchemy import delete, insert, select
+from sqlalchemy import insert, select
 from sqlalchemy.orm import Session, selectinload
 
-from src.db.test_models import ClassProfile, Course, Enrollment, Student
+from src import create_logger
+from src.db.models import DBRole, DBUser, DBUserFeedback
+from src.schemas import UserWithHashSchema
+from src.schemas.input_schema import FeedbackRequestSchema, RoleSchema
+from src.schemas.types import RoleType
+
+logger = create_logger("crud")
 
 
-class ClassProfileEnum(str, Enum):
-    SCIENCE = "science"
-    ARTS = "arts"
-    COMMERCIAL = "commercial"
+def get_user_by_email(db: Session, email: str) -> DBUser | None:
+    """Get a user by their email address."""
+    stmt = select(DBUser).where(DBUser.email == email)
+    return db.scalar(stmt)
 
 
-class StudentSchema(BaseModel):
-    matric_no: str
-    firstname: str
-    lastname: str
-    age: int
-    registered_at: str = Field(default_factory=lambda _: datetime.now().isoformat())
-    class_profile: ClassProfileEnum | None = None
-    courses: list["CourseSchema"] = Field(default_factory=list)
+def get_user_by_username(db: Session, username: str) -> DBUser | None:
+    """Get a user by their username."""
+    stmt = select(DBUser).where(DBUser.username == username)
+    return db.scalar(stmt)
 
 
-class CourseSchema(BaseModel):
-    name: "CourseNameEnum"
-    units: int = Field(ge=1, le=3)
-    registered_at: str = Field(default_factory=lambda _: datetime.now().isoformat())
-    students: list[StudentSchema] = Field(default_factory=list)
+def get_user_by_id(db: Session, user_id: int) -> DBUser | None:
+    """Get a user by their ID."""
+    stmt = select(DBUser).where(DBUser.id == user_id)
+    return db.scalar(stmt)
 
 
-class EnrollmentSchema(BaseModel):
-    student_id: int
-    course_id: int
-    grade: float | None = None
-    registered_at: str = Field(default_factory=lambda _: datetime.now().isoformat())
-    student: StudentSchema | None = None
-    course: CourseSchema | None = None
+def get_feedback_by_username(
+    db: Session, session_id: str, message_index: int, user_name: str
+) -> DBUserFeedback | None:
+    """Get feedback by session ID, message index, and user name."""
+    stmt = select(DBUserFeedback).where(
+        DBUserFeedback.session_id == session_id,
+        DBUserFeedback.message_index == message_index,
+        DBUserFeedback.user_name == user_name,
+    )
+    return db.scalar(stmt)
 
 
-class ClassProfileSchema(BaseModel):
-    name: str
-    profile: ClassProfileEnum | str
-    registered_at: str = Field(default_factory=lambda _: datetime.now().isoformat())
-
-
-class CourseNameEnum(str, Enum):
-    ENGLISH_LANGUAGE = "english language"
-    MATHEMATICS = "mathematics"
-    CIVIC_EDUCATION = "civic education"
-    BIOLOGY = "biology"
-    PHYSICS = "physics"
-    CHEMISTRY = "chemistry"
-    LITERATURE_IN_ENGLISH = "literature in english"
-    GOVERNMENT = "government"
-    ECONOMICS = "economics"
-    COMMERCE = "commerce"
-
-
-# =========================================================
-# ==================== CRUD Operations ====================
-# =========================================================
-def get_class_profile(
-    db: Session, name: str, profile: ClassProfileEnum | str
-) -> ClassProfile:
-    """Get class profile by name."""
+def get_role_by_name(db: Session, name: RoleType | str) -> DBRole | None:
+    """Get a role by its name."""
     stmt = (
-        select(ClassProfile)
-        # Select the list of students
-        .options(selectinload(ClassProfile.students))
-        .where(ClassProfile.name == name, ClassProfile.profile == profile)
+        select(DBRole)
+        # Select the list of users associated with the role
+        .options(selectinload(DBRole.users))
+        .where(DBRole.name == name)
     )
     return db.scalar(stmt)
 
 
-def get_course_name(db: Session, name: CourseNameEnum | str) -> Course:
-    """Get course by name."""
-    return db.scalar(select(Course).where(Course.name == name))
-
-
-def get_course_by_id(db: Session, course_id: int) -> Course:
-    """Get course by ID."""
-    return db.scalar(select(Course).where(Course.id == course_id))
-
-
-def get_student_by_matric_no(db: Session, matric_no: str) -> Student:
-    """Get student by matriculation number."""
-    return db.scalar(select(Student).where(Student.matric_no == matric_no))
-
-
-def get_student_by_id(db: Session, student_id: int) -> Student:
-    """Get student by ID."""
-    return db.scalar(select(Student).where(Student.id == student_id))
-
-
-def get_enrollment_by_student_id_and_course_id(
-    db: Session, student_id: int, course_id: int
-) -> Enrollment:
-    """Get enrollment by student ID and course ID."""
-    stmt = select(Enrollment).where(
-        Enrollment.student_id == student_id, Enrollment.course_id == course_id
-    )
-    return db.scalar(stmt)
-
-
-def get_grades_for_course(db: Session, course_id: int) -> list[Enrollment]:
-    """Get all enrollments with grades for a course."""
-    stmt = select(Enrollment).where(Enrollment.course_id == course_id)
-    return list(db.scalars(stmt).all())
-
-
-def get_grades_for_student(db: Session, student_id: int) -> list[Enrollment]:
-    """Get all enrollments with grades for a student."""
-    stmt = select(Enrollment).where(Enrollment.student_id == student_id)
-    return list(db.scalars(stmt).all())
-
-
-def create_student(db: Session, student: StudentSchema) -> Student:
-    """Create a new student in the database."""
+def convert_userdb_to_schema(db_user: DBUser) -> UserWithHashSchema | None:
+    """Convert a DBUser object to a UserWithHashSchema object."""
     try:
-        # Check if student already exists
-        existing_student = get_student_by_matric_no(db=db, matric_no=student.matric_no)
-        if existing_student:
-            raise ValueError(
-                "Student with the same firstname, lastname and matriculation number already exists."
-            )
+        return UserWithHashSchema(
+            id=db_user.id,
+            firstname=db_user.firstname,
+            lastname=db_user.lastname,
+            username=db_user.username,
+            email=db_user.email,
+            is_active=db_user.is_active,
+            created_at=db_user.created_at.isoformat(timespec="seconds"),
+            updated_at=db_user.updated_at.isoformat(timespec="seconds")
+            if db_user.updated_at
+            else None,
+            hashed_password=db_user.hashed_password,
+            roles=[role.name for role in db_user.roles],
+        )
+    except Exception as e:
+        logger.error(f"Error converting DBUser to UserWithHashSchema: {e}")
+        return None
+
+
+def create_user(db: Session, user: UserWithHashSchema) -> DBUser:
+    """Create a new user in the database."""
+    try:
+        # Check if email or username already exists
+        existing_user = get_user_by_email(db, user.email)
+        if existing_user:
+            raise ValueError(f"Email {user.email!r} is already registered.")
+
+        values: dict[str, Any] = user.model_dump(
+            exclude={"id", "roles", "updated_at", "created_at"}
+        )
+        stmt = insert(DBUser).values(**values).returning(DBUser)
+        db_user = db.scalar(stmt)
+        db.commit()
+        logger.info(f"Logged new user with ID: {db_user.id!r} to the database.")
+        return db_user
+
+    except Exception as e:
+        logger.error(f"Error creating user: {e}")
+        db.rollback()
+        raise e
+
+
+def create_feedback(db: Session, feedback: FeedbackRequestSchema) -> DBUserFeedback:
+    """Create a new user feedback entry in the database."""
+    try:
+        values: dict[str, Any] = feedback.model_dump(exclude={"timestamp"})
+        # Serialize sources list to JSON string for database storage
+        if "sources" in values and isinstance(values["sources"], list):
+            values["sources"] = json.dumps(values["sources"])
+        stmt = insert(DBUserFeedback).values(**values).returning(DBUserFeedback)
+        db_feedback = db.scalar(stmt)
+        db.commit()
+        logger.info(f"Logged new feedback with ID: {db_feedback.id!r} to the database.")
+        return db_feedback
+
+    except Exception as e:
+        logger.error(f"Error creating feedback: {e}")
+        db.rollback()
+        raise e
+
+
+def create_role(db: Session, role: RoleSchema) -> DBRole:
+    """Create a new role in the database."""
+    try:
+        # Check if role exists
+        db_role = get_role_by_name(db=db, name=role.name)
+        if db_role is not None:
+            logger.info(f"Role '{role.name}' already exists with ID: {db_role.id}")
+            return db_role
+
         stmt = (
-            insert(Student)
-            .values(student.model_dump(exclude={"courses", "class_profile"}))
-            .returning(Student)
+            insert(DBRole)
+            .values(role.model_dump(exclude={"id", "created_at", "updated_at"}))
+            .returning(DBRole)
         )
-        db_student = db.scalars(stmt).one()
+        db_role = db.scalar(stmt)
         db.commit()
-
-        return db_student
+        logger.info(f"Logged new role with ID: {db_role.id!r} to the database.")
+        return db_role
 
     except Exception as e:
+        logger.error(f"Error creating role: {e}")
         db.rollback()
         raise e
 
 
-def create_class_profile(
-    db: Session, class_profile: ClassProfileSchema
-) -> ClassProfile:
-    """Create a new class profile in the database."""
+def assign_role_to_user(db: Session, username: str, role: RoleType) -> None:
+    """Assign a role to a user."""
     try:
-        if not get_class_profile(
-            db, name=class_profile.name, profile=class_profile.profile
-        ):
-            stmt = (
-                insert(ClassProfile)
-                .values(class_profile.model_dump())
-                .returning(ClassProfile)
-            )
-            db_class_profile = db.scalar(stmt)
+        # Check that role and user exist
+        if not (db_role := get_role_by_name(db=db, name=role)):
+            raise ValueError(f"Role {role} does not exist!")
+
+        if not (db_user := get_user_by_username(db=db, username=username)):
+            raise ValueError(f"User {username} does not exist!")
+
+        if db_user not in db_role.users:
+            db_role.users.append(db_user)
             db.commit()
-            return db_class_profile
+            logger.info(f"Assigned role {role!r} to user {username!r}.")
+        else:
+            logger.info(f"User {username!r} already has role {role!r}.")
+
+        return
 
     except Exception as e:
-        db.rollback()
-        raise e
-
-    raise ValueError("Class Profile with the same name already exists.")
-
-
-def create_course_by_name(db: Session, course: CourseSchema) -> Course:
-    """Create a new course in the database."""
-    try:
-        if not get_course_name(db, name=course.name):
-            stmt = (
-                insert(Course)
-                .values(course.model_dump(exclude={"students"}))
-                .returning(Course)
-            )
-            db_course = db.scalar(stmt)
-            db.commit()
-            return db_course
-
-    except Exception as e:
-        db.rollback()
-        raise e
-
-    raise ValueError("Course with the same name already exists.")
-
-
-def enroll_student_into_course(db: Session, enrollment: EnrollmentSchema) -> Enrollment:
-    """Enroll an existing student into an existing course."""
-    try:
-        student = get_student_by_id(db, enrollment.student_id)
-        course = get_course_by_id(db, enrollment.course_id)
-        if not student or not course:
-            raise ValueError("not found")
-
-        existing = get_enrollment_by_student_id_and_course_id(
-            db=db, student_id=enrollment.student_id, course_id=enrollment.course_id
-        )
-        if existing:
-            return existing
-
-        stmt = insert(Enrollment).values(enrollment.model_dump()).returning(Enrollment)
-        db_enrollment = db.scalar(stmt)
-        db.commit()
-        return db_enrollment
-
-    except Exception as e:
-        db.rollback()
-        raise e
-
-
-def unenroll_student_from_course(db: Session, course_id: int, matric_no: str) -> Course:
-    """Remove a student from a course's student list.
-
-    If the student is enrolled, remove them and commit. Returns the Course.
-    """
-    try:
-        student = get_student_by_matric_no(db=db, matric_no=matric_no)
-        if not student:
-            raise ValueError("Student not found")
-
-        course = get_course_by_id(db=db, course_id=course_id)
-        if not course:
-            raise ValueError("Course not found")
-
-        # Delete the enrollment record
-        delete_stmt = delete(Enrollment).where(
-            Enrollment.student_id == student.id, Enrollment.course_id == course_id
-        )
-        _ = db.scalar(delete_stmt)
-        db.commit()
-
-        return course
-
-    except Exception as e:
-        db.rollback()
-        raise e
-
-
-def enroll_class_profile(
-    db: Session, class_profile: ClassProfileSchema, matric_no: str
-) -> ClassProfile:
-    """Enroll an existing student into an existing class profile."""
-    try:
-        cp = get_class_profile(
-            db=db, name=class_profile.name, profile=class_profile.profile
-        )
-        if not cp:
-            raise ValueError("Class Profile not found")
-
-        student = get_student_by_matric_no(db=db, matric_no=matric_no)
-        if not student:
-            raise ValueError("Student not found")
-
-        # Verify that the student has not been enrolled
-        if student not in cp.students:
-            cp.students.append(student)
-        db.commit()
-        db.refresh(cp)
-
-        return cp
-
-    except Exception as e:
-        db.rollback()
-        raise e
-
-
-def unenroll_class_profile(
-    db: Session, class_profile: ClassProfileSchema, matric_no: str
-) -> ClassProfile:
-    """Remove a student from a class profile's student list.
-
-    If the student is enrolled, remove them and commit. Returns the ClassProfile.
-    """
-    try:
-        cp = get_class_profile(
-            db=db, name=class_profile.name, profile=class_profile.profile
-        )
-        if not cp:
-            raise ValueError("Class Profile not found")
-
-        student = get_student_by_matric_no(db=db, matric_no=matric_no)
-        if not student:
-            raise ValueError("Student not found")
-
-        if student in cp.students:
-            cp.students.remove(student)
-            db.commit()
-            db.refresh(cp)
-
-        return cp
-
-    except Exception as e:
-        db.rollback()
-        raise e
-
-
-def set_grade_for_enrollment(
-    db: Session, student_id: int, course_id: int, grade: float
-) -> Enrollment:
-    """Set or update the grade for a student's enrollment in a course."""
-    try:
-        enrollment = get_enrollment_by_student_id_and_course_id(
-            db, student_id, course_id
-        )
-        if not enrollment:
-            raise ValueError("Enrollment not found")
-        enrollment.grade = grade
-        db.commit()
-        db.refresh(enrollment)
-        return enrollment
-
-    except Exception as e:
-        db.rollback()
-        raise e
+        logger.error(f"Error assigning role to user: {e}")
+        raise

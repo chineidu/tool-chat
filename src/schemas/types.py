@@ -56,3 +56,11 @@ class Feedback(str, Enum):
     POSITIVE = "positive"
     NEGATIVE = "negative"
     NEUTRAL = None
+
+
+class RoleType(str, Enum):
+    """Enumeration of possible user roles."""
+
+    ADMIN = "admin"
+    USER = "user"
+    GUEST = "guest"

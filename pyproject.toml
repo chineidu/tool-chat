@@ -27,7 +27,6 @@ dependencies = [
     "uvicorn>=0.38.0",
 ]
 
-[dependency-groups]
-dev = [
-    "prek>=0.2.12",
-]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

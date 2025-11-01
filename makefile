@@ -1,16 +1,29 @@
-.PHONY: help install api-run streamlit src clean test lint format
+.PHONY: help install api-run streamlit src clean test test-verbose lint format clean-cache up down restart logs clean-all setup status
 
 help:
 	@echo "Tool Chat - Available commands:"
 	@echo ""
-	@echo "  make install    - Install all dependencies"
-	@echo "  make api-run    - Run FastAPI server"
-	@echo "  make streamlit  - Run Streamlit app"
-	@echo "  make src        - Run both API and Streamlit (requires tmux)"
-	@echo "  make test       - Run tests"
-	@echo "  make lint       - Run linter (ruff)"
-	@echo "  make format     - Format code (ruff)"
-	@echo "  make clean      - Clean up cache and temporary files"
+	@echo "📦 Development:"
+	@echo "  make install        - Install all dependencies"
+	@echo "  make test           - Run tests"
+	@echo "  make test-verbose   - Run tests with verbose output"
+	@echo "  make lint           - Run linter (ruff)"
+	@echo "  make format         - Format code (ruff)"
+	@echo "  make clean-cache    - Clean up cache and temporary files"
+	@echo ""
+	@echo "🚀 Running the Application:"
+	@echo "  make api-run        - Run FastAPI server on http://localhost:8080"
+	@echo "  make streamlit      - Run Streamlit app on http://localhost:8501"
+	@echo "  make src            - Run both API and Streamlit (requires tmux)"
+	@echo ""
+	@echo "🐳 Docker Services:"
+	@echo "  make up             - Start all services"
+	@echo "  make down           - Stop all services"
+	@echo "  make restart        - Restart services"
+	@echo "  make logs            - View logs"
+	@echo "  make status         - Check status"
+	@echo "  make setup          - Setup from scratch"
+	@echo "  make clean-all      - Clean everything (including volumes)"
 	@echo ""
 
 install:
@@ -43,7 +56,11 @@ src:
 
 test:
 	@echo "🧪 Running tests..."
-	uv run pytest
+	uv run -m pytest
+
+test-verbose:
+	@echo "🧪 Running tests..."
+	uv run -m pytest -v
 
 lint:
 	@echo "🔍 Running linter..."
@@ -62,7 +79,7 @@ clean-cache:
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "✅ Cleanup complete"
 
-.PHONY: up down restart logs clean setup
+.PHONY: up down restart logs clean setup status clean-all
 
 # Start all services
 up:
