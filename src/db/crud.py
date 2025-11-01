@@ -1,8 +1,14 @@
+"""
+CRUD operations for managing database entities.
+It uses SQLAlchemy ORM v2.xx style queries for efficiency and high performance.
+"""
+
 from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy import delete, insert, select
+from sqlalchemy.orm import Session, selectinload
 
 from src.db.test_models import ClassProfile, Course, Enrollment, Student
 
@@ -14,7 +20,7 @@ class ClassProfileEnum(str, Enum):
 
 
 class StudentSchema(BaseModel):
-    matriculation_number: str
+    matric_no: str
     firstname: str
     lastname: str
     age: int
@@ -40,7 +46,8 @@ class EnrollmentSchema(BaseModel):
 
 
 class ClassProfileSchema(BaseModel):
-    profile: ClassProfileEnum
+    name: str
+    profile: ClassProfileEnum | str
     registered_at: str = Field(default_factory=lambda _: datetime.now().isoformat())
 
 
@@ -60,120 +67,151 @@ class CourseNameEnum(str, Enum):
 # =========================================================
 # ==================== CRUD Operations ====================
 # =========================================================
-def get_class_profile_by_name(
-    db: Session, name: ClassProfileEnum | str
+def get_class_profile(
+    db: Session, name: str, profile: ClassProfileEnum | str
 ) -> ClassProfile:
     """Get class profile by name."""
-    return db.query(ClassProfile).filter(ClassProfile.profile == name).first()
+    stmt = (
+        select(ClassProfile)
+        # Select the list of students
+        .options(selectinload(ClassProfile.students))
+        .where(ClassProfile.name == name, ClassProfile.profile == profile)
+    )
+    return db.scalar(stmt)
 
 
 def get_course_name(db: Session, name: CourseNameEnum | str) -> Course:
     """Get course by name."""
-    return db.query(Course).filter(Course.name == name).first()
+    return db.scalar(select(Course).where(Course.name == name))
 
 
 def get_course_by_id(db: Session, course_id: int) -> Course:
     """Get course by ID."""
-    return db.query(Course).filter(Course.id == course_id).first()
+    return db.scalar(select(Course).where(Course.id == course_id))
 
 
 def get_student_by_matric_no(db: Session, matric_no: str) -> Student:
     """Get student by matriculation number."""
-    return db.query(Student).filter(Student.matric_no == matric_no).first()
+    return db.scalar(select(Student).where(Student.matric_no == matric_no))
 
 
 def get_student_by_id(db: Session, student_id: int) -> Student:
     """Get student by ID."""
-    return db.query(Student).filter(Student.id == student_id).first()
+    return db.scalar(select(Student).where(Student.id == student_id))
 
 
-def get_class_profile_by_id(db: Session, class_profile_id: int) -> ClassProfile:
-    """Get class profile by ID."""
-    return db.query(ClassProfile).filter(ClassProfile.id == class_profile_id).first()
+def get_enrollment_by_student_id_and_course_id(
+    db: Session, student_id: int, course_id: int
+) -> Enrollment:
+    """Get enrollment by student ID and course ID."""
+    stmt = select(Enrollment).where(
+        Enrollment.student_id == student_id, Enrollment.course_id == course_id
+    )
+    return db.scalar(stmt)
+
+
+def get_grades_for_course(db: Session, course_id: int) -> list[Enrollment]:
+    """Get all enrollments with grades for a course."""
+    stmt = select(Enrollment).where(Enrollment.course_id == course_id)
+    return list(db.scalars(stmt).all())
+
+
+def get_grades_for_student(db: Session, student_id: int) -> list[Enrollment]:
+    """Get all enrollments with grades for a student."""
+    stmt = select(Enrollment).where(Enrollment.student_id == student_id)
+    return list(db.scalars(stmt).all())
 
 
 def create_student(db: Session, student: StudentSchema) -> Student:
     """Create a new student in the database."""
-    # Check if student already exists
-    existing_student = get_student_by_matric_no(
-        db=db, matric_no=student.matriculation_number
-    )
-    if existing_student:
-        raise ValueError(
-            "Student with the same firstname, lastname and matriculation number already exists."
+    try:
+        # Check if student already exists
+        existing_student = get_student_by_matric_no(db=db, matric_no=student.matric_no)
+        if existing_student:
+            raise ValueError(
+                "Student with the same firstname, lastname and matriculation number already exists."
+            )
+        stmt = (
+            insert(Student)
+            .values(student.model_dump(exclude={"courses", "class_profile"}))
+            .returning(Student)
         )
-
-    db_student = Student(
-        firstname=student.firstname,
-        lastname=student.lastname,
-        age=student.age,
-        matriculation_number=student.matriculation_number,
-        class_profile=student.class_profile.value if student.class_profile else None,
-    )
-    db.add(db_student)
-    db.commit()
-    db.refresh(db_student)
-    return db_student
-
-
-def create_class_profiles(db: Session) -> None:
-    """Create default class profiles if they do not exist."""
-    arts_name = ClassProfileEnum.ARTS.value
-    commercial_name = ClassProfileEnum.COMMERCIAL.value
-    science_name = ClassProfileEnum.SCIENCE.value
-
-    if (
-        not get_class_profile_by_name(db, name=arts_name)
-        and not get_class_profile_by_name(db, name=commercial_name)
-        and not get_class_profile_by_name(db, name=science_name)
-    ):
-        return  # Profiles already exist
-
-    # Else, create them
-    arts = ClassProfile(profile=ClassProfileEnum.ARTS.value)
-    commercial = ClassProfile(profile=ClassProfileEnum.COMMERCIAL.value)
-    science = ClassProfile(profile=ClassProfileEnum.SCIENCE.value)
-    for profile in [arts, commercial, science]:
-        db.add(profile)
+        db_student = db.scalars(stmt).one()
         db.commit()
-        db.refresh(profile)
 
-    return
+        return db_student
+
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def create_class_profile(
+    db: Session, class_profile: ClassProfileSchema
+) -> ClassProfile:
+    """Create a new class profile in the database."""
+    try:
+        if not get_class_profile(
+            db, name=class_profile.name, profile=class_profile.profile
+        ):
+            stmt = (
+                insert(ClassProfile)
+                .values(class_profile.model_dump())
+                .returning(ClassProfile)
+            )
+            db_class_profile = db.scalar(stmt)
+            db.commit()
+            return db_class_profile
+
+    except Exception as e:
+        db.rollback()
+        raise e
+
+    raise ValueError("Class Profile with the same name already exists.")
 
 
 def create_course_by_name(db: Session, course: CourseSchema) -> Course:
     """Create a new course in the database."""
-    if not get_course_name(db, name=course.name):
-        course_name = Course(
-            name=course.name, units=course.units, registered_at=course.registered_at
-        )
-        db.add(course_name)
-        db.commit()
-        db.refresh(course_name)
-        return course_name
+    try:
+        if not get_course_name(db, name=course.name):
+            stmt = (
+                insert(Course)
+                .values(course.model_dump(exclude={"students"}))
+                .returning(Course)
+            )
+            db_course = db.scalar(stmt)
+            db.commit()
+            return db_course
+
+    except Exception as e:
+        db.rollback()
+        raise e
 
     raise ValueError("Course with the same name already exists.")
 
 
-def enroll_student_into_course(db: Session, course_id: int, matric_no: str):
-    student = get_student_by_matric_no(db, matric_no)
-    course = get_course_by_id(db, course_id)
-    if not student or not course:
-        raise ValueError("not found")
+def enroll_student_into_course(db: Session, enrollment: EnrollmentSchema) -> Enrollment:
+    """Enroll an existing student into an existing course."""
+    try:
+        student = get_student_by_id(db, enrollment.student_id)
+        course = get_course_by_id(db, enrollment.course_id)
+        if not student or not course:
+            raise ValueError("not found")
 
-    existing = (
-        db.query(Enrollment)
-        .filter_by(student_id=student.id, course_id=course.id)
-        .first()
-    )
-    if existing:
-        return existing
+        existing = get_enrollment_by_student_id_and_course_id(
+            db=db, student_id=enrollment.student_id, course_id=enrollment.course_id
+        )
+        if existing:
+            return existing
 
-    enrollment = Enrollment(student_id=student.id, course_id=course.id)
-    db.add(enrollment)
-    db.commit()
-    db.refresh(enrollment)
-    return enrollment
+        stmt = insert(Enrollment).values(enrollment.model_dump()).returning(Enrollment)
+        db_enrollment = db.scalar(stmt)
+        db.commit()
+        return db_enrollment
+
+    except Exception as e:
+        db.rollback()
+        raise e
 
 
 def unenroll_student_from_course(db: Session, course_id: int, matric_no: str) -> Course:
@@ -181,66 +219,102 @@ def unenroll_student_from_course(db: Session, course_id: int, matric_no: str) ->
 
     If the student is enrolled, remove them and commit. Returns the Course.
     """
-    course = get_course_by_id(db=db, course_id=course_id)
-    if not course:
-        raise ValueError("Course not found")
+    try:
+        student = get_student_by_matric_no(db=db, matric_no=matric_no)
+        if not student:
+            raise ValueError("Student not found")
 
-    student = get_student_by_matric_no(db=db, matric_no=matric_no)
-    if not student:
-        raise ValueError("Student not found")
+        course = get_course_by_id(db=db, course_id=course_id)
+        if not course:
+            raise ValueError("Course not found")
 
-    if student in getattr(course, "students", []):
-        course.students.remove(student)
-        db.add(course)
+        # Delete the enrollment record
+        delete_stmt = delete(Enrollment).where(
+            Enrollment.student_id == student.id, Enrollment.course_id == course_id
+        )
+        _ = db.scalar(delete_stmt)
         db.commit()
-        db.refresh(course)
 
-    return course
+        return course
+
+    except Exception as e:
+        db.rollback()
+        raise e
 
 
 def enroll_class_profile(
-    db: Session, class_profile_id: int, matric_no: str
+    db: Session, class_profile: ClassProfileSchema, matric_no: str
 ) -> ClassProfile:
     """Enroll an existing student into an existing class profile."""
-    class_profile = get_class_profile_by_id(db=db, class_profile_id=class_profile_id)
-    if not class_profile:
-        raise ValueError("Class Profile not found")
+    try:
+        cp = get_class_profile(
+            db=db, name=class_profile.name, profile=class_profile.profile
+        )
+        if not cp:
+            raise ValueError("Class Profile not found")
 
-    student = get_student_by_matric_no(db=db, matric_no=matric_no)
-    if not student:
-        raise ValueError("Student not found")
+        student = get_student_by_matric_no(db=db, matric_no=matric_no)
+        if not student:
+            raise ValueError("Student not found")
 
-    # Verify that the student has not been enrolled
-    if student in getattr(class_profile, "students", []):
-        return class_profile
+        # Verify that the student has not been enrolled
+        if student not in cp.students:
+            cp.students.append(student)
+        db.commit()
+        db.refresh(cp)
 
-    class_profile.students.append(student)
-    db.add(class_profile)
-    db.commit()
-    db.refresh(class_profile)
+        return cp
 
-    return class_profile
+    except Exception as e:
+        db.rollback()
+        raise e
 
 
 def unenroll_class_profile(
-    db: Session, class_profile_id: int, matric_no: str
+    db: Session, class_profile: ClassProfileSchema, matric_no: str
 ) -> ClassProfile:
     """Remove a student from a class profile's student list.
 
     If the student is enrolled, remove them and commit. Returns the ClassProfile.
     """
-    class_profile = get_class_profile_by_id(db=db, class_profile_id=class_profile_id)
-    if not class_profile:
-        raise ValueError("Class Profile not found")
+    try:
+        cp = get_class_profile(
+            db=db, name=class_profile.name, profile=class_profile.profile
+        )
+        if not cp:
+            raise ValueError("Class Profile not found")
 
-    student = get_student_by_matric_no(db=db, matric_no=matric_no)
-    if not student:
-        raise ValueError("Student not found")
+        student = get_student_by_matric_no(db=db, matric_no=matric_no)
+        if not student:
+            raise ValueError("Student not found")
 
-    if student in getattr(class_profile, "students", []):
-        class_profile.students.remove(student)
-        db.add(class_profile)
+        if student in cp.students:
+            cp.students.remove(student)
+            db.commit()
+            db.refresh(cp)
+
+        return cp
+
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def set_grade_for_enrollment(
+    db: Session, student_id: int, course_id: int, grade: float
+) -> Enrollment:
+    """Set or update the grade for a student's enrollment in a course."""
+    try:
+        enrollment = get_enrollment_by_student_id_and_course_id(
+            db, student_id, course_id
+        )
+        if not enrollment:
+            raise ValueError("Enrollment not found")
+        enrollment.grade = grade
         db.commit()
-        db.refresh(class_profile)
+        db.refresh(enrollment)
+        return enrollment
 
-    return class_profile
+    except Exception as e:
+        db.rollback()
+        raise e
