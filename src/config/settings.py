@@ -106,6 +106,11 @@ class Settings(BaseSettingsConfig):
     LANGFUSE_PUBLIC_KEY: SecretStr = SecretStr("your_langfuse_public_key")
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
 
+    # ===== API AUTHENTICATION =====
+    SECRET_KEY: SecretStr = SecretStr("your_secret_key")
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
     @field_validator("POSTGRES_PORT", mode="before")
     @classmethod
     def parse_port_fields(cls, v: str | int) -> int:

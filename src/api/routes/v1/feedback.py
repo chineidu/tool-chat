@@ -53,12 +53,7 @@ async def submit_feedback(feedback_data: FeedbackRequestSchema) -> FeedbackRespo
 
         # Here you would typically save to a database
 
-        # For now, log to console/file
-        import json
-
-        feedback_log_path = "feedback_logs.jsonl"
-
-        log_entry = {
+        _ = {
             "session_id": feedback_data.session_id,
             "message_index": feedback_data.message_index,
             "user_message": feedback_data.user_message,
@@ -67,10 +62,7 @@ async def submit_feedback(feedback_data: FeedbackRequestSchema) -> FeedbackRespo
             "feedback": feedback_data.feedback,
             "timestamp": feedback_data.timestamp,
         }
-
-        # Append to JSONL file
-        with open(feedback_log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry) + "\n")
+        # create_role()
 
         logger.info(
             f"[FEEDBACK] Session: {feedback_data.session_id}, "

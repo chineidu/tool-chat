@@ -1,3 +1,7 @@
+"""
+Test LLM streaming functionality.
+"""
+
 from typing import Any, Callable
 from unittest.mock import MagicMock
 

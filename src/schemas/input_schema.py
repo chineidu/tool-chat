@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field  # type: ignore
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, SecretStr  # type: ignore
 from pydantic.alias_generators import to_camel
 
 from src.schemas.types import FeedbackType, RoleType
@@ -105,6 +105,23 @@ class UserWithHashSchema(UserSchema):
     """User schema with password hash."""
 
     hashed_password: str
+
+
+class UserCreateSchema(UserSchema):
+    """User creation schema."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "firstname": "John",
+                "lastname": "Doe",
+                "username": "johndoe",
+                "email": "john.doe@example.com",
+                "password": "<your_password_here>",
+            }
+        }
+    )
+    password: SecretStr = Field(..., description="User's password")
 
 
 class RoleSchema(BaseSchema):

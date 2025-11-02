@@ -89,6 +89,9 @@ class APIConfig(BaseSchema):
     version: str = Field(..., description="The version of the API.")
     status: str = Field(..., description="The current status of the API.")
     prefix: str = Field(..., description="The prefix for the API routes.")
+    auth_prefix: str = Field(
+        ..., description="The prefix for the authentication routes."
+    )
     server: Server = Field(description="Server configuration.")
     middleware: Middleware = Field(description="Middleware configuration.")
 

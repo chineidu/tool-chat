@@ -2,6 +2,7 @@ from src.schemas.input_schema import (
     BaseSchema,
     FeedbackRequestSchema,
     RoleSchema,
+    UserCreateSchema,
     UserSchema,
     UserWithHashSchema,
 )
@@ -18,6 +19,7 @@ __all__: list[str] = [
     "FeedbackResponseSchema",
     "HealthStatusSchema",
     "RoleSchema",
+    "UserCreateSchema",
     "UserSchema",
     "UserWithHashSchema",
 ]

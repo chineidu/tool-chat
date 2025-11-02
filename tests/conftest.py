@@ -30,17 +30,19 @@ if TYPE_CHECKING:
 # ======================== CLIENT  =========================
 # ==========================================================
 @pytest.fixture(scope="function")
-def client() -> Generator[TestClient, None, None]:
+def client(db_session: Session) -> Generator[TestClient, None, None]:
     """Create a TestClient for FastAPI app."""
     # Import here to avoid circular imports
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
-    from src.api.routes import feedback, health, history, streamer
+    from src.api.routes import auth, feedback, health, history, streamer
     from src.config import app_config
+    from src.db.models import get_db
 
     # Create a test app without lifespan to avoid database connections
     prefix = app_config.api_config.prefix
+    auth_prefix: str = app_config.api_config.auth_prefix
     test_app = FastAPI(
         title="Test API",
         description="API for testing",
@@ -59,11 +61,18 @@ def client() -> Generator[TestClient, None, None]:
         allow_headers=app_config.api_config.middleware.cors.allow_headers,
     )
 
+    # Override database dependency
+    def override_get_db() -> Generator[Session, None, None]:
+        yield db_session
+
+    test_app.dependency_overrides[get_db] = override_get_db
+
     # Include routers
     test_app.include_router(feedback.router, prefix=prefix)
     test_app.include_router(health.router, prefix=prefix)
     test_app.include_router(streamer.router, prefix=prefix)
     test_app.include_router(history.router, prefix=prefix)
+    test_app.include_router(auth.router, prefix=auth_prefix)
 
     with TestClient(test_app) as test_client:
         yield test_client
@@ -73,8 +82,8 @@ def client() -> Generator[TestClient, None, None]:
 # ==================== CRUD Operations =====================
 # ==========================================================
 @pytest.fixture(
-    # Created ONCE for the entire test session
-    scope="session",
+    # Each test gets a fresh in-memory database/instance
+    scope="function",
 )
 def engine() -> Generator[Engine, None, None]:
     """Create a test database engine using SQLite."""
@@ -90,7 +99,7 @@ def engine() -> Generator[Engine, None, None]:
     yield test_engine
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def tables(engine: Engine) -> Generator[None, None, None]:
     """Create all database tables.
 
@@ -101,7 +110,7 @@ def tables(engine: Engine) -> Generator[None, None, None]:
     Base.metadata.drop_all(bind=engine)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def initialized_db(engine: Engine, tables: None) -> Generator[None, None, None]:  # noqa: ARG001
     """Initialize the test database with default roles.
 
