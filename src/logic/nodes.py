@@ -20,7 +20,7 @@ from src.logic.prompts import (
 )
 from src.logic.state import State
 from src.logic.tools import date_and_time_tool, search_tool
-from src.utilities.model_config import ModelProvider, get_model_name
+from src.utilities.model_config import ModelProviders, get_model_name
 
 logger = create_logger(name="nodes")
 
@@ -37,7 +37,7 @@ llm_model_name = get_model_name(
 )
 llm_model_creds = (
     (app_settings.GROQ_API_KEY.get_secret_value(), app_settings.GROQ_URL)
-    if llm_model_name == ModelProvider.GROQ
+    if llm_model_name == ModelProviders.GROQ
     else (
         app_settings.OPENROUTER_API_KEY.get_secret_value(),
         app_settings.OPENROUTER_URL,
@@ -49,7 +49,7 @@ summarization_llm_name = get_model_name(
 )
 summarization_llm_creds = (
     (app_settings.GROQ_API_KEY.get_secret_value(), app_settings.GROQ_URL)
-    if summarization_llm_name == ModelProvider.GROQ
+    if summarization_llm_name == ModelProviders.GROQ
     else (
         app_settings.OPENROUTER_API_KEY.get_secret_value(),
         app_settings.OPENROUTER_URL,

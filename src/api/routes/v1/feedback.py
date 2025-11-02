@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from src import create_logger
 from src.schemas import FeedbackRequestSchema
-from src.schemas.types import Feedback
+from src.schemas.types import FeedbackType
 
 logger = create_logger(name="feedback_api")
 
@@ -38,9 +38,9 @@ async def submit_feedback(feedback_data: FeedbackRequestSchema) -> FeedbackRespo
     try:
         # Validate feedback type if provided
         if feedback_data.feedback and feedback_data.feedback not in [
-            Feedback.POSITIVE,
-            Feedback.NEGATIVE,
-            Feedback.NEUTRAL,
+            FeedbackType.POSITIVE,
+            FeedbackType.NEGATIVE,
+            FeedbackType.NEUTRAL,
         ]:
             raise HTTPException(
                 status_code=400,

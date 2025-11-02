@@ -31,7 +31,7 @@ class GroqModels(str, Enum):
     QWEN3_32B = "qwen/qwen3-32b"
 
 
-class ModelProvider(str, Enum):
+class ModelProviders(str, Enum):
     OPENROUTER = "openrouter"
     GROQ = "groq"
 
@@ -50,7 +50,7 @@ class Events(str, Enum):
     COMPLETION_END = "end"
 
 
-class Feedback(str, Enum):
+class FeedbackType(str, Enum):
     """Enumeration of possible feedback types."""
 
     POSITIVE = "positive"

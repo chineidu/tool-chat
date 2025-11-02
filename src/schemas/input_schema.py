@@ -4,7 +4,7 @@ from typing import Annotated
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field  # type: ignore
 from pydantic.alias_generators import to_camel
 
-from src.schemas.types import Feedback, RoleType
+from src.schemas.types import FeedbackType, RoleType
 
 
 def round_probability(value: float) -> float:
@@ -63,8 +63,8 @@ class FeedbackRequestSchema(BaseModel):
     user_message: str = Field(default="", description="User's question/prompt")
     assistant_message: str = Field(..., description="Assistant's response")
     sources: list[str] = Field(default_factory=list, description="List of source URLs")
-    feedback: Feedback = Field(
-        default=Feedback.NEUTRAL,
+    feedback: FeedbackType = Field(
+        default=FeedbackType.NEUTRAL,
         description="Feedback type: 'positive', 'negative', or null",
     )
     timestamp: str | None = Field(

@@ -7,7 +7,7 @@ from pydantic import Field
 
 from src import PACKAGE_PATH
 from src.schemas import BaseSchema
-from src.schemas.types import ModelProvider, RemoteModel
+from src.schemas.types import ModelProviders, RemoteModel
 
 
 class CreativeModelConfig(BaseSchema):
@@ -16,7 +16,7 @@ class CreativeModelConfig(BaseSchema):
     model_name: str | RemoteModel = Field(
         ..., description="The name of the creative LLM to use."
     )
-    model_provider: str | ModelProvider = Field(
+    model_provider: str | ModelProviders = Field(
         ..., description="The provider of the creative LLM."
     )
     temperature: float = Field(
@@ -33,7 +33,7 @@ class StructuredOutputModelConfig(BaseSchema):
     model_name: str | RemoteModel = Field(
         ..., description="The name of the structured output LLM to use."
     )
-    model_provider: str | ModelProvider = Field(
+    model_provider: str | ModelProviders = Field(
         ..., description="The provider of the structured output LLM."
     )
     temperature: float = Field(

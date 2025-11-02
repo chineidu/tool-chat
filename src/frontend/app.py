@@ -10,7 +10,7 @@ import httpx
 import streamlit as st
 
 from src.config import app_config
-from src.schemas.types import Events, Feedback
+from src.schemas.types import Events, FeedbackType
 
 # Configuration
 API_BASE_URL: str = (
@@ -76,7 +76,7 @@ async def send_feedback_to_api(message_index: int, feedback_type: str | None) ->
         # Ensure feedback is null for neutral, not the string 'None'
         feedback_value = feedback_type
         if feedback_value in ("neutral", "None", None):
-            feedback_value = Feedback.NEUTRAL.value
+            feedback_value = FeedbackType.NEUTRAL.value
 
         payload: dict[str, Any] = {
             "session_id": st.session_state.checkpoint_id or "no_session",
@@ -177,7 +177,7 @@ def render_feedback_buttons(message_index: int) -> None:
         btn_label = "👍"
         if anim_state == "positive":
             btn_label = "🔄"
-        elif current_feedback == Feedback.POSITIVE:
+        elif current_feedback == FeedbackType.POSITIVE:
             btn_label = "✅"
         if st.button(
             btn_label,
@@ -185,9 +185,9 @@ def render_feedback_buttons(message_index: int) -> None:
             help="Helpful",
             use_container_width=True,
         ):
-            if current_feedback == Feedback.POSITIVE:
+            if current_feedback == FeedbackType.POSITIVE:
                 # Toggle to neutral, do NOT send feedback
-                st.session_state.feedback[feedback_key] = Feedback.NEUTRAL.value
+                st.session_state.feedback[feedback_key] = FeedbackType.NEUTRAL.value
                 st.rerun()
                 return
             # Start animation for positive feedback
@@ -199,7 +199,7 @@ def render_feedback_buttons(message_index: int) -> None:
         btn_label = "👎"
         if anim_state == "negative":
             btn_label = "🔄"
-        elif current_feedback == Feedback.NEGATIVE:
+        elif current_feedback == FeedbackType.NEGATIVE:
             btn_label = "❌"
         if st.button(
             btn_label,
@@ -207,9 +207,9 @@ def render_feedback_buttons(message_index: int) -> None:
             help="Not helpful",
             use_container_width=True,
         ):
-            if current_feedback == Feedback.NEGATIVE:
+            if current_feedback == FeedbackType.NEGATIVE:
                 # Toggle to neutral, do NOT send feedback
-                st.session_state.feedback[feedback_key] = Feedback.NEUTRAL.value
+                st.session_state.feedback[feedback_key] = FeedbackType.NEUTRAL.value
                 st.rerun()
                 return
             # Start animation for negative feedback
@@ -221,9 +221,9 @@ def render_feedback_buttons(message_index: int) -> None:
     if anim_state in ("positive", "negative"):
         time.sleep(0.01)
         if anim_state == "positive":
-            st.session_state.feedback[feedback_key] = Feedback.POSITIVE
+            st.session_state.feedback[feedback_key] = FeedbackType.POSITIVE
         else:
-            st.session_state.feedback[feedback_key] = Feedback.NEGATIVE
+            st.session_state.feedback[feedback_key] = FeedbackType.NEGATIVE
         st.session_state[anim_key] = None
         asyncio.run(
             send_feedback_to_api(message_index, st.session_state.feedback[feedback_key])

@@ -18,7 +18,7 @@ from src.db.crud import (
     get_user_by_username,
 )
 from src.schemas import FeedbackRequestSchema, RoleSchema, UserWithHashSchema
-from src.schemas.types import Feedback, RoleType
+from src.schemas.types import FeedbackType, RoleType
 
 
 class TestUserCRUD:
@@ -26,21 +26,28 @@ class TestUserCRUD:
 
     def test_get_user_by_email_not_found(self, db_session: Session) -> None:
         """Test getting a user by email when user doesn't exist."""
+        # Given and When
         user = get_user_by_email(db_session, "nonexistent@example.com")
+        # Then
         assert user is None
 
     def test_get_user_by_username_not_found(self, db_session: Session) -> None:
         """Test getting a user by username when user doesn't exist."""
+        # Given and When
         user = get_user_by_username(db_session, "nonexistent")
+        # Then
         assert user is None
 
     def test_get_user_by_id_not_found(self, db_session: Session) -> None:
         """Test getting a user by ID when user doesn't exist."""
+        # Given and When
         user = get_user_by_id(db_session, 999)
+        # Then
         assert user is None
 
     def test_create_user_success(self, db_session: Session) -> None:
         """Test creating a new user successfully."""
+        # Given
         user_data = UserWithHashSchema(
             firstname="John",
             lastname="Doe",
@@ -50,8 +57,10 @@ class TestUserCRUD:
             is_active=True,
         )
 
+        # When
         user = create_user(db_session, user_data)
 
+        # Then
         assert user is not None
         assert user.firstname == "John"
         assert user.lastname == "Doe"
@@ -62,6 +71,8 @@ class TestUserCRUD:
 
     def test_create_user_duplicate_email(self, db_session: Session) -> None:
         """Test creating a user with duplicate email raises ValueError."""
+
+        # Given
         user_data = UserWithHashSchema(
             firstname="Neidu",
             lastname="Doey",
@@ -70,6 +81,7 @@ class TestUserCRUD:
             hashed_password="hashed_password_123",
         )
 
+        # When
         # Create first user
         create_user(db_session, user_data)
 
@@ -82,11 +94,14 @@ class TestUserCRUD:
             hashed_password="hashed_password_456",
         )
 
+        # Then
         with pytest.raises(ValueError, match="Email .* is already registered"):
             create_user(db_session, duplicate_user)
 
     def test_get_user_by_email_found(self, db_session: Session) -> None:
         """Test getting a user by email when user exists."""
+
+        # Given
         user_data = UserWithHashSchema(
             firstname="Jane",
             lastname="Smith",
@@ -95,15 +110,19 @@ class TestUserCRUD:
             hashed_password="hashed_password_456",
         )
 
+        # When
         created_user = create_user(db_session, user_data)
         retrieved_user = get_user_by_email(db_session, "jane.smith@example.com")
 
+        # Then
         assert retrieved_user is not None
         assert retrieved_user.id == created_user.id
         assert retrieved_user.email == "jane.smith@example.com"
 
     def test_get_user_by_username_found(self, db_session: Session) -> None:
         """Test getting a user by username when user exists."""
+
+        # Given
         user_data = UserWithHashSchema(
             firstname="Bob",
             lastname="Johnson",
@@ -112,15 +131,18 @@ class TestUserCRUD:
             hashed_password="hashed_password_789",
         )
 
+        # When
         created_user = create_user(db_session, user_data)
         retrieved_user = get_user_by_username(db_session, "bobjohnson")
 
+        # Then
         assert retrieved_user is not None
         assert retrieved_user.id == created_user.id
         assert retrieved_user.username == "bobjohnson"
 
     def test_get_user_by_id_found(self, db_session: Session) -> None:
         """Test getting a user by ID when user exists."""
+        # Given
         user_data = UserWithHashSchema(
             firstname="Alice",
             lastname="Brown",
@@ -129,14 +151,17 @@ class TestUserCRUD:
             hashed_password="hashed_password_101",
         )
 
+        # When
         created_user = create_user(db_session, user_data)
         retrieved_user = get_user_by_id(db_session, created_user.id)
 
+        # Then
         assert retrieved_user is not None
         assert retrieved_user.id == created_user.id
 
     def test_convert_userdb_to_schema(self, db_session: Session) -> None:
         """Test converting DBUser to UserWithHashSchema."""
+        # Given
         user_data = UserWithHashSchema(
             firstname="Charlie",
             lastname="Wilson",
@@ -145,9 +170,11 @@ class TestUserCRUD:
             hashed_password="hashed_password_202",
         )
 
+        # When
         db_user = create_user(db_session, user_data)
         schema_user = convert_userdb_to_schema(db_user)
 
+        # Then
         assert schema_user is not None
         assert schema_user.id == db_user.id
         assert schema_user.firstname == db_user.firstname
@@ -164,14 +191,16 @@ class TestFeedbackCRUD:
 
     def test_get_feedback_by_username_not_found(self, db_session: Session) -> None:
         """Test getting feedback when it doesn't exist."""
+        # Given and When
         feedback = get_feedback_by_username(
             db_session, "session123", 1, "nonexistent_user"
         )
+        # Then
         assert feedback is None
 
     def test_create_feedback_success(self, db_session: Session) -> None:
         """Test creating feedback successfully."""
-        # First create a user
+        # Given
         user_data = UserWithHashSchema(
             firstname="chinedu",
             lastname="Manuel",
@@ -189,11 +218,13 @@ class TestFeedbackCRUD:
             user_message="What is AI?",
             assistant_message="AI stands for Artificial Intelligence.",
             sources=["https://example.com"],
-            feedback=Feedback.POSITIVE,
+            feedback=FeedbackType.POSITIVE,
         )
 
+        # When
         feedback = create_feedback(db_session, feedback_data)
 
+        # Then
         assert feedback is not None
         assert feedback.username == "chinedu_manuel"
         assert feedback.session_id == "session123"
@@ -205,6 +236,7 @@ class TestFeedbackCRUD:
 
     def test_get_feedback_by_username_found(self, db_session: Session) -> None:
         """Test getting feedback when it exists."""
+        # Given
         # First create a user
         user_data = UserWithHashSchema(
             firstname="Feedback",
@@ -222,14 +254,16 @@ class TestFeedbackCRUD:
             message_index=1,
             user_message="What is machine learning?",
             assistant_message="AI stands for Artificial Intelligence. It's a field of computer science.",
-            feedback=Feedback.POSITIVE,
+            feedback=FeedbackType.POSITIVE,
         )
 
+        # When
         created_feedback = create_feedback(db_session, feedback_data)
         retrieved_feedback = get_feedback_by_username(
             db_session, "session456", 1, "johndoe_feedback"
         )
 
+        # Then
         assert retrieved_feedback is not None
         assert retrieved_feedback.id == created_feedback.id
         assert retrieved_feedback.session_id == "session456"
@@ -242,18 +276,23 @@ class TestRoleCRUD:
 
     def test_get_role_by_name_not_found(self, db_session: Session) -> None:
         """Test getting a role by name when it doesn't exist."""
+        # Given and When
         role = get_role_by_name(db_session, "nonexistent_role")  # type: ignore
+        # Then
         assert role is None
 
     def test_create_role_success(self, db_session: Session) -> None:
         """Test creating a new role successfully."""
+        # Given
         role_data = RoleSchema(
             name=RoleType.ADMIN,
             description="Administrator role",
         )
 
+        # When
         role = create_role(db_session, role_data)
 
+        # Then
         assert role is not None
         assert role.name == "admin"
         # Since ADMIN role already exists from initialization, it should return existing role
@@ -261,37 +300,44 @@ class TestRoleCRUD:
 
     def test_create_role_duplicate(self, db_session: Session) -> None:
         """Test creating a role that already exists returns existing role."""
+        # Given
         role_data = RoleSchema(
             name=RoleType.ADMIN,
             description="Administrator role",
         )
 
+        # When
         # Create first role
         first_role = create_role(db_session, role_data)
 
         # Try to create the same role again
         second_role = create_role(db_session, role_data)
 
+        # Then
         # Should return the same role
         assert first_role.id == second_role.id
         assert first_role.name == second_role.name
 
     def test_get_role_by_name_found(self, db_session: Session) -> None:
         """Test getting a role by name when it exists."""
+        # Given
         role_data = RoleSchema(
             name=RoleType.ADMIN,
             description="Administrator role",
         )
 
+        # When
         created_role = create_role(db_session, role_data)
         retrieved_role = get_role_by_name(db_session, RoleType.ADMIN)
 
+        # Then
         assert retrieved_role is not None
         assert retrieved_role.id == created_role.id
         assert retrieved_role.name == "admin"
 
     def test_assign_role_to_user_success(self, db_session: Session) -> None:
         """Test assigning a role to a user successfully."""
+        # Given
         # Create user
         user_data = UserWithHashSchema(
             firstname="Frank",
@@ -309,9 +355,11 @@ class TestRoleCRUD:
         )
         role = create_role(db_session, role_data)
 
+        # When
         # Assign role to user
         assign_role_to_user(db_session, "frank_lamps", RoleType.USER)
 
+        # Then
         # Refresh user from database
         db_session.refresh(user)
         db_session.refresh(role)
@@ -323,18 +371,22 @@ class TestRoleCRUD:
 
     def test_assign_role_to_user_nonexistent_user(self, db_session: Session) -> None:
         """Test assigning role to nonexistent user raises ValueError."""
+        # Given
         # Create role first
         role_data = RoleSchema(
             name=RoleType.ADMIN,
             description="Administrator role",
         )
+        # Create the role
         create_role(db_session, role_data)
 
+        # When / Then
         with pytest.raises(ValueError, match="User nonexistent does not exist"):
             assign_role_to_user(db_session, "nonexistent", RoleType.ADMIN)
 
     def test_assign_role_to_user_nonexistent_role(self, db_session: Session) -> None:
         """Test assigning nonexistent role to user raises ValueError."""
+        # Given
         # Create user
         user_data = UserWithHashSchema(
             firstname="Kemi",
@@ -345,11 +397,13 @@ class TestRoleCRUD:
         )
         create_user(db_session, user_data)
 
+        # When / Then
         with pytest.raises(ValueError, match="Role nonexistent does not exist"):
             assign_role_to_user(db_session, "kemiahmed", "nonexistent")  # type: ignore
 
     def test_assign_role_to_user_already_assigned(self, db_session: Session) -> None:
         """Test assigning already assigned role doesn't duplicate."""
+        # Given
         # Create user
         user_data = UserWithHashSchema(
             firstname="Henry",
@@ -367,6 +421,7 @@ class TestRoleCRUD:
         )
         create_role(db_session, role_data)
 
+        # When
         # Assign role first time
         assign_role_to_user(db_session, "henryobi", RoleType.GUEST)
 
@@ -376,6 +431,7 @@ class TestRoleCRUD:
         # Refresh user from database
         db_session.refresh(user)
 
+        # Then
         # Should still have only one role
         assert len(user.roles) == 1
         assert user.roles[0].name == "guest"

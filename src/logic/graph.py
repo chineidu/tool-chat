@@ -101,21 +101,3 @@ class GraphManager:
         logger.info("Graph instance built and compiled with Postgres checkpointer.")
 
         return self.graph_instance
-
-
-# # Legacy functions for backward compatibility (will be removed)
-# async def initialize_checkpointer() -> None:
-#     """Legacy function - use GraphManager instead."""
-#     pass
-
-
-# async def cleanup_checkpointer() -> None:
-#     """Legacy function - use GraphManager instead."""
-#     pass
-
-
-# async def build_graph() -> CompiledStateGraph:
-#     """Legacy function - use GraphManager instead."""
-#     # This will be replaced with dependency injection
-#     manager = GraphManager()
-#     return await manager.build_graph()
