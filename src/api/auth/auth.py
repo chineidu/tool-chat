@@ -12,6 +12,7 @@ from src.config import app_config, app_settings
 from src.db.crud import convert_userdb_to_schema, get_user_by_username
 from src.db.models import DBUser, get_db
 from src.schemas import UserWithHashSchema
+from src.schemas.types import RoleType
 
 logger = create_logger(name="auth")
 prefix: str = app_config.api_config.prefix
@@ -93,4 +94,16 @@ async def get_current_active_user(
     """Get the current active user."""
     if not current_user.is_active:  # type: ignore
         raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+
+
+async def get_current_admin_user(
+    current_user: UserWithHashSchema = Depends(get_current_active_user),
+) -> UserWithHashSchema:  # noqa: B008
+    """Get the current active admin user."""
+    if RoleType.ADMIN not in current_user.roles:  # type: ignore
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
     return current_user

@@ -19,6 +19,13 @@ def round_probability(value: float) -> float:
     return value
 
 
+def normalize_feedback(value: str | None) -> str | None:
+    """Normalize feedback value, converting string 'None' to None."""
+    if value == "None":
+        return None
+    return value
+
+
 Float = Annotated[float, BeforeValidator(round_probability)]
 
 
@@ -54,16 +61,22 @@ class FeedbackRequestSchema(BaseModel):
         }
     )
 
-    username: str = Field(..., description="Username of the user providing feedback")
-    user_id: int = Field(..., description="ID of the user providing feedback")
     session_id: str = Field(..., description="Session/checkpoint ID")
+    user_id: int | None = Field(
+        default=None,
+        description="ID of the user providing feedback (auto-populated from auth)",
+    )
+    username: str | None = Field(
+        default=None,
+        description="Username of the user providing feedback (auto-populated from auth)",
+    )
     message_index: int = Field(
         ..., ge=0, description="Index of the message in conversation"
     )
     user_message: str = Field(default="", description="User's question/prompt")
     assistant_message: str = Field(..., description="Assistant's response")
     sources: list[str] = Field(default_factory=list, description="List of source URLs")
-    feedback: FeedbackType = Field(
+    feedback: Annotated[FeedbackType, BeforeValidator(normalize_feedback)] = Field(
         default=FeedbackType.NEUTRAL,
         description="Feedback type: 'positive', 'negative', or null",
     )

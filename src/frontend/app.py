@@ -4,9 +4,11 @@ import asyncio
 import json
 import re
 import time
+from collections import Counter
 from typing import Any
 
 import httpx
+import plotly.graph_objects as go
 import streamlit as st
 
 from src.config import app_config
@@ -19,6 +21,9 @@ API_BASE_URL: str = (
 CHAT_STREAM_ENDPOINT: str = f"{API_BASE_URL}/api/v1/chat_stream"
 FEEDBACK_ENDPOINT: str = f"{API_BASE_URL}/api/v1/feedback"
 CHAT_HISTORY_ENDPOINT: str = f"{API_BASE_URL}/api/v1/chat_history"
+REGISTER_ENDPOINT: str = f"{API_BASE_URL}/api/v1/auth/register"
+LOGIN_ENDPOINT: str = f"{API_BASE_URL}/api/v1/auth/token"
+USER_ME_ENDPOINT: str = f"{API_BASE_URL}/api/v1/auth/users/me"
 
 
 def initialize_session_state() -> None:
@@ -31,6 +36,13 @@ def initialize_session_state() -> None:
         st.session_state.message_count = 0
     if "feedback" not in st.session_state:
         st.session_state.feedback = {}
+    # Authentication state
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+    if "access_token" not in st.session_state:
+        st.session_state.access_token = None
+    if "user_info" not in st.session_state:
+        st.session_state.user_info = None
 
 
 def parse_sse_event(line: str) -> dict[str, Any] | None:
@@ -50,8 +62,7 @@ def clean_content(content: str) -> str:
     content = re.sub(r"<details>\s*<summary>([^<]+)</summary>", r"**\1**", content)
     content = re.sub(r"</details>|<details>", "", content)
     content = content.replace("<summary>", "**").replace("</summary>", "**")
-    content = re.sub(r"<[^>]+>", "", content)
-    return content
+    return re.sub(r"<[^>]+>", "", content)
 
 
 async def send_feedback_to_api(message_index: int, feedback_type: str | None) -> None:
@@ -87,8 +98,14 @@ async def send_feedback_to_api(message_index: int, feedback_type: str | None) ->
             "feedback": feedback_value,
         }
 
+        headers = {}
+        if st.session_state.access_token:
+            headers["Authorization"] = f"Bearer {st.session_state.access_token}"
+
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(FEEDBACK_ENDPOINT, json=payload)
+            response = await client.post(
+                FEEDBACK_ENDPOINT, json=payload, headers=headers
+            )
             response.raise_for_status()
             st.toast("✅ Feedback saved!", icon="✅")
 
@@ -101,9 +118,15 @@ async def send_feedback_to_api(message_index: int, feedback_type: str | None) ->
 async def load_chat_history(checkpoint_id: str) -> bool:
     """Load chat history from a checkpoint ID."""
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        headers = {}
+        if st.session_state.access_token:
+            headers["Authorization"] = f"Bearer {st.session_state.access_token}"
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                CHAT_HISTORY_ENDPOINT, params={"checkpoint_id": checkpoint_id}
+                CHAT_HISTORY_ENDPOINT,
+                params={"checkpoint_id": checkpoint_id},
+                headers=headers,
             )
             response.raise_for_status()
             data = response.json()
@@ -254,6 +277,10 @@ async def stream_chat_response(message: str, checkpoint_id: str | None = None) -
     if checkpoint_id:
         params["checkpoint_id"] = checkpoint_id
 
+    headers = {}
+    if st.session_state.access_token:
+        headers["Authorization"] = f"Bearer {st.session_state.access_token}"
+
     st.session_state.messages.append({"role": "user", "content": message})
     render_message("user", message)
 
@@ -268,7 +295,7 @@ async def stream_chat_response(message: str, checkpoint_id: str | None = None) -
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
                 async with client.stream(
-                    "GET", CHAT_STREAM_ENDPOINT, params=params
+                    "GET", CHAT_STREAM_ENDPOINT, params=params, headers=headers
                 ) as response:
                     response.raise_for_status()
 
@@ -331,6 +358,175 @@ async def stream_chat_response(message: str, checkpoint_id: str | None = None) -
         }
     )
     st.session_state.message_count += 1
+
+
+async def authenticate_user(username: str, password: str) -> bool:
+    """Authenticate user with the API."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                LOGIN_ENDPOINT, data={"username": username, "password": password}
+            )
+            response.raise_for_status()
+            data = response.json()
+            st.session_state.access_token = data.get("access_token")
+            st.session_state.authenticated = True
+            # Get user info
+            await get_user_info()
+            return True
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 401:
+            st.error("❌ Invalid username or password")
+        else:
+            st.error(f"❌ Login failed: {e.response.status_code}")
+        return False
+    except Exception as e:
+        st.error(f"❌ Error: {str(e)}")
+        return False
+
+
+async def register_user(
+    username: str, email: str, password: str, firstname: str, lastname: str
+) -> bool:
+    """Register a new user with the API."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                REGISTER_ENDPOINT,
+                json={
+                    "username": username,
+                    "email": email,
+                    "password": password,
+                    "firstname": firstname,
+                    "lastname": lastname,
+                },
+            )
+            response.raise_for_status()
+            st.success("✅ Registration successful! Please login.")
+            return True
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 400:
+            error_detail = e.response.json().get("detail", "Registration failed")
+            st.error(f"❌ {error_detail}")
+        else:
+            st.error(f"❌ Registration failed: {e.response.status_code}")
+        return False
+    except Exception as e:
+        st.error(f"❌ Error: {str(e)}")
+        return False
+
+
+async def get_user_info() -> None:
+    """Get current user information."""
+    if not st.session_state.access_token:
+        return
+
+    try:
+        headers = {"Authorization": f"Bearer {st.session_state.access_token}"}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(USER_ME_ENDPOINT, headers=headers)
+            response.raise_for_status()
+            st.session_state.user_info = response.json()
+    except Exception as e:
+        st.error(f"❌ Failed to get user info: {str(e)}")
+
+
+def logout() -> None:
+    """Logout user and clear session state."""
+    st.session_state.authenticated = False
+    st.session_state.access_token = None
+    st.session_state.user_info = None
+    st.session_state.messages = []
+    st.session_state.checkpoint_id = None
+    st.session_state.message_count = 0
+    st.session_state.feedback = {}
+    st.rerun()
+
+
+def show_login_page() -> None:
+    """Display the login page."""
+    st.title("🔐 Login to AI Chat Assistant")
+
+    with st.form("login_form"):
+        username = st.text_input("Username", placeholder="Enter your username")
+        password = st.text_input(
+            "Password", type="password", placeholder="Enter your password"
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            login_submitted = st.form_submit_button(
+                "🔑 Login", use_container_width=True
+            )
+        with col2:
+            register_submitted = st.form_submit_button(
+                "📝 Register", use_container_width=True
+            )
+
+        if login_submitted:
+            if not username or not password:
+                st.error("❌ Please fill in all fields")
+            else:
+                with st.spinner("Logging in..."):
+                    if asyncio.run(authenticate_user(username, password)):
+                        st.success("✅ Login successful!")
+                        st.rerun()
+
+        if register_submitted:
+            st.session_state.show_register = True
+            st.rerun()
+
+
+def show_register_page() -> None:
+    """Display the registration page."""
+    st.title("📝 Register for AI Chat Assistant")
+
+    with st.form("register_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            firstname = st.text_input("First Name", placeholder="Enter your first name")
+        with col2:
+            lastname = st.text_input("Last Name", placeholder="Enter your last name")
+
+        username = st.text_input("Username", placeholder="Choose a username")
+        email = st.text_input("Email", placeholder="Enter your email")
+        password = st.text_input(
+            "Password", type="password", placeholder="Choose a password"
+        )
+        confirm_password = st.text_input(
+            "Confirm Password", type="password", placeholder="Confirm your password"
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            register_submitted = st.form_submit_button(
+                "📝 Register", use_container_width=True
+            )
+        with col2:
+            back_submitted = st.form_submit_button(
+                "⬅️ Back to Login", use_container_width=True
+            )
+
+        if register_submitted:
+            if not all(
+                [firstname, lastname, username, email, password, confirm_password]
+            ):
+                st.error("❌ Please fill in all fields")
+            elif password != confirm_password:
+                st.error("❌ Passwords do not match")
+            elif len(password) < 6:
+                st.error("❌ Password must be at least 6 characters long")
+            else:
+                with st.spinner("Registering..."):
+                    if asyncio.run(
+                        register_user(username, email, password, firstname, lastname)
+                    ):
+                        st.session_state.show_register = False
+                        st.rerun()
+
+        if back_submitted:
+            st.session_state.show_register = False
+            st.rerun()
 
 
 def main() -> None:
@@ -673,9 +869,32 @@ def main() -> None:
 
     initialize_session_state()
 
+    # Check authentication
+    if not st.session_state.authenticated:
+        if st.session_state.get("show_register", False):
+            show_register_page()
+        else:
+            show_login_page()
+        return
+
+    # Authenticated user - show main chat interface
+
     # Sidebar
     with st.sidebar:
+        # User info
+        if st.session_state.user_info:
+            st.header(f"👤 {st.session_state.user_info.get('username', 'User')}")
+            st.caption(
+                f"{st.session_state.user_info.get('firstname', '')} {st.session_state.user_info.get('lastname', '')}"
+            )
+            st.caption(st.session_state.user_info.get("email", ""))
+
+        st.divider()
+
         st.header("⚙️ Settings")
+
+        if st.button("🚪 Logout", use_container_width=True):
+            logout()
 
         if st.button("🗑️ Clear Chat History", use_container_width=True):
             st.session_state.messages = []
@@ -712,22 +931,43 @@ def main() -> None:
             )
 
         if st.session_state.feedback:
-            positive = sum(
-                1 for v in st.session_state.feedback.values() if v == "positive"
-            )
-            negative = sum(
-                1 for v in st.session_state.feedback.values() if v == "negative"
-            )
-            total = positive + negative
+            feedback_counter = Counter(st.session_state.feedback.values())
+            positive = feedback_counter.get("positive", 0)
+            negative = feedback_counter.get("negative", 0)
+            neutral = feedback_counter.get("neutral", 0)
+            total = positive + negative + neutral
 
-            st.subheader("💭 Feedback")
+            st.subheader("💭 Feedback Summary")
             col1, col2 = st.columns(2)
-            col1.metric("👍", positive)
-            col2.metric("👎", negative)
+            col1.metric("👍 Positive", positive)
+            col2.metric("👎 Negative", negative)
+            st.caption(f"😐 Neutral: {neutral}")
 
             if total > 0:
-                st.progress(positive / total)
-                st.caption(f"{(positive / total) * 100:.0f}% satisfaction")
+                labels = ["Positive", "Negative", "Neutral"]
+                values = [positive, negative, neutral]
+                colors = ["#4CAF50", "#F44336", "#BDBDBD"]
+                fig = go.Figure(
+                    data=[
+                        go.Pie(
+                            labels=labels,
+                            values=values,
+                            marker=dict(colors=colors),
+                            hole=0.5,
+                        )
+                    ]
+                )
+                fig.update_layout(
+                    margin=dict(l=0, r=0, t=0, b=0), showlegend=True, height=200
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+                if positive + negative > 0:
+                    satisfaction = (positive / (positive + negative)) * 100
+                    st.progress(positive / (positive + negative))
+                    st.caption(f"{satisfaction:.0f}% satisfaction (of rated feedback)")
+                else:
+                    st.caption("No rated feedback yet.")
 
         st.divider()
 

@@ -8,6 +8,7 @@ from typing import Any, AsyncGenerator
 from fastapi import FastAPI, HTTPException, Request, status
 
 from src import create_logger
+from src.db.init import init_db
 from src.logic.graph import GraphManager
 
 warnings.filterwarnings("ignore")
@@ -27,6 +28,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
     try:
         start_time: float = time.perf_counter()
         logger.info("Starting up application and loading model...")
+
+        # Initialize database
+        init_db()
 
         # ===================================================
         # ================= Load model here =================

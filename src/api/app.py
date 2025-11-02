@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api import lifespan
-from src.api.routes import auth, feedback, health, history, streamer
+from src.api.routes import admin, auth, feedback, health, history, streamer
 from src.config import app_config
 
 warnings.filterwarnings("ignore")
@@ -46,6 +46,7 @@ def create_application() -> FastAPI:
 
     # Include routers
     app.include_router(auth.router, prefix=auth_prefix)
+    app.include_router(admin.router, prefix=prefix)
     app.include_router(feedback.router, prefix=prefix)
     app.include_router(health.router, prefix=prefix)
     app.include_router(streamer.router, prefix=prefix)

@@ -89,7 +89,7 @@ async def login_for_access_token(
 
     Parameters
     ----------
-    form_data : OAuth2PasswordRequestForm
+    form_data: OAuth2PasswordRequestForm
         Dependency-injected form containing 'username' and 'password' fields. Provided by FastAPI via Depends().
 
     Returns
