@@ -83,9 +83,8 @@ class DBUserFeedback(Base):
     user_message: Mapped[str] = mapped_column(String(), nullable=False)
     assistant_message: Mapped[str] = mapped_column(String(), nullable=False)
     sources: Mapped[str] = mapped_column(String(), nullable=True)
-    feedback: Mapped[str] = mapped_column(
-        String(20), nullable=True
-    )  # e.g., 'positive', 'negative', 'neutral'
+    # e.g., 'positive', 'negative', 'neutral'
+    feedback: Mapped[str] = mapped_column(String(20), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=func.now()
     )

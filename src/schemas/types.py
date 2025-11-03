@@ -26,8 +26,7 @@ class GroqModels(str, Enum):
 
     GPT_OSS_20B = "openai/gpt-oss-20b"
     GPT_OSS_120B = "openai/gpt-oss-120b"
-    LLAMA_GUARD_4_12B = "meta-llama/llama-guard-4-12b"
-    LLAMA_3_1_8B_INSTANT = "llama-3.1-8b-instant"
+    LLAMA_GUARD_4_12B = "meta-llama/llama-4-scout-17b-16e-instruct"
     QWEN3_32B = "qwen/qwen3-32b"
 
 

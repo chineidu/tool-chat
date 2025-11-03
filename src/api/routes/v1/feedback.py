@@ -3,28 +3,20 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src import create_logger
 from src.api.auth.auth import get_current_active_user
 from src.db.crud import create_feedback
 from src.db.models import get_db
-from src.schemas import UserWithHashSchema
-from src.schemas.input_schema import FeedbackRequestSchema
+from src.schemas import (
+    FeedbackRequestSchema,
+    FeedbackResponseSchema,
+    UserWithHashSchema,
+)
 from src.schemas.types import FeedbackType
 
 logger = create_logger(name="feedback_api")
-
-
-class FeedbackResponse(BaseModel):
-    """Feedback response model."""
-
-    success: bool
-    message: str
-    feedback_id: str | None = None
-    user_id: int | None = None
-    username: str | None = None
 
 
 # Create router
@@ -36,7 +28,7 @@ async def submit_feedback(
     feedback_data: FeedbackRequestSchema,
     current_user: UserWithHashSchema = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> FeedbackResponse:
+) -> FeedbackResponseSchema:
     """
     Submit user feedback for a chat message.
 
@@ -68,8 +60,7 @@ async def submit_feedback(
         ]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Feedback must be {FeedbackType.POSITIVE!r}, {FeedbackType.NEGATIVE!r}, "
-                f"or {FeedbackType.NEUTRAL!r}.",
+                detail=f"Feedback must be {', '.join(fb.value for fb in FeedbackType)}.",
             )
 
         # Add timestamp if not provided
@@ -86,7 +77,7 @@ async def submit_feedback(
             f"User: {current_user.username}"
         )
 
-        return FeedbackResponse(
+        return FeedbackResponseSchema(
             success=True,
             message="Feedback recorded successfully",
             feedback_id=f"{db_feedback.id}",
@@ -98,9 +89,6 @@ async def submit_feedback(
         raise
     except Exception as e:
         logger.error(f"[ERROR] Failed to save feedback: {str(e)}")
-        import traceback
-
-        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save feedback: {str(e)}",

@@ -1,4 +1,4 @@
-.PHONY: help install api-run streamlit src clean test test-verbose lint format clean-cache up down restart logs clean-all setup status
+.PHONY: help install api-run frontend src clean test test-verbose lint format clean-cache up down restart logs clean-all setup status
 
 help:
 	@echo "Tool Chat - Available commands:"
@@ -13,7 +13,7 @@ help:
 	@echo ""
 	@echo "🚀 Running the Application:"
 	@echo "  make api-run        - Run FastAPI server on http://localhost:8080"
-	@echo "  make streamlit      - Run Streamlit app on http://localhost:8501"
+	@echo "  make frontend      - Run Streamlit app on http://localhost:8501"
 	@echo "  make src            - Run both API and Streamlit (requires tmux)"
 	@echo ""
 	@echo "🐳 Docker Services:"
@@ -34,7 +34,7 @@ api-run:
 	@echo "🚀 Starting FastAPI server on http://localhost:8080"
 	uv run -m src.api.app
 
-streamlit:
+frontend:
 	@echo "🎨 Starting Streamlit app on http://localhost:8501"
 	uv run -m streamlit run src/frontend/app.py
 
@@ -51,7 +51,7 @@ src:
 	else \
 		echo "❌ tmux is not installed. Please install it or run servers separately:"; \
 		echo "   Terminal 1: make api-run"; \
-		echo "   Terminal 2: make streamlit"; \
+		echo "   Terminal 2: make frontend"; \
 	fi
 
 test:

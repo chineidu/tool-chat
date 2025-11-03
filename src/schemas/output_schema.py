@@ -11,6 +11,8 @@ class FeedbackResponseSchema(BaseSchema):
     success: bool
     message: str
     feedback_id: str | None = None
+    user_id: int | None = None
+    username: str | None = None
 
 
 class ChatHistorySchema(BaseSchema):
