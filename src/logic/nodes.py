@@ -29,7 +29,7 @@ logger = create_logger(name="nodes")
 # ===============================================================
 MAX_CREATIVE_TOKENS: int = app_config.llm_model_config.creative_model.max_tokens
 MAX_SUMMARY_TOKENS: int = app_config.llm_model_config.structured_output_model.max_tokens
-MAX_MESSAGES: int = 30
+MAX_MESSAGES: int = 40
 
 llm_model_name = get_model_name(
     model_provider=app_config.llm_model_config.creative_model.model_provider,

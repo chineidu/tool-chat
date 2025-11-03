@@ -12,7 +12,7 @@ from pathlib import Path
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.api.auth.auth import get_password_hash
+from src.api.core.auth import get_password_hash
 from src.db.crud import (
     assign_role_to_user,
     create_role,

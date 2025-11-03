@@ -4,6 +4,8 @@ import warnings
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from src.api import lifespan
 from src.api.routes import admin, auth, feedback, health, history, streamer
@@ -51,6 +53,9 @@ def create_application() -> FastAPI:
     app.include_router(health.router, prefix=prefix)
     app.include_router(streamer.router, prefix=prefix)
     app.include_router(history.router, prefix=prefix)
+
+    # Add exception handlers
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     return app
 

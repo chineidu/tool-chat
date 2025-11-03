@@ -73,6 +73,7 @@ class BaseSettingsConfig(BaseSettings):
         env_file_encoding="utf-8",
         from_attributes=True,
         populate_by_name=True,
+        strict=True,
     )
 
 
@@ -87,6 +88,12 @@ class Settings(BaseSettingsConfig):
     POSTGRES_PORT: int = 5432
 
     API_DB_NAME: str = "user_feedback_db"
+
+    # ===== REDIS CACHE =====
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: SecretStr = SecretStr("your_redis_password")
+    REDIS_DB: int = 0
 
     # ===== REMOTE INFERENCE =====
     # GROQ
@@ -111,7 +118,12 @@ class Settings(BaseSettingsConfig):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    @field_validator("POSTGRES_PORT", mode="before")
+    # ===== API CONFIGURATION =====
+    CONCURRENT_STREAM_KEY: str = "chat:concurrent"
+    MAX_CONCURRENT: int = 3
+    TTL: int = 3600
+
+    @field_validator("POSTGRES_PORT", "REDIS_PORT", mode="before")
     @classmethod
     def parse_port_fields(cls, v: str | int) -> int:
         """Parses port fields to ensure they are integers."""
@@ -123,6 +135,24 @@ class Settings(BaseSettingsConfig):
 
         if isinstance(v, int) and not (1 <= v <= 65535):
             raise ValueError(f"Port must be between 1 and 65535, got {v}")
+
+        return v
+
+    @field_validator(
+        "REDIS_DB",
+        "ACCESS_TOKEN_EXPIRE_MINUTES",
+        "MAX_CONCURRENT",
+        "TTL",
+        mode="before",
+    )
+    @classmethod
+    def parse_int_fields(cls, v: str | int) -> int:
+        """Parses int fields to ensure they are integers."""
+        if isinstance(v, str):
+            try:
+                return int(v.strip())
+            except ValueError:
+                raise ValueError(f"Invalid integer value: {v}") from None
 
         return v
 
@@ -170,6 +200,23 @@ class Settings(BaseSettingsConfig):
             f":{self.POSTGRES_PORT}"
             f"/{self.API_DB_NAME}"
         )
+        return fix_url_credentials(url)
+
+    @property
+    def redis_url(self) -> str:
+        """
+        Constructs the API database connection URL.
+
+        This is the database used for user authentication and API-specific tables.
+        It's separate from MLflow's database to avoid conflicts.
+
+        Returns
+        -------
+        str
+            Complete database connection URL in the format:
+            postgresql+psycopg2://user:password@host:port/dbname
+        """
+        url: str = f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
         return fix_url_credentials(url)
 
 

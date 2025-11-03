@@ -15,6 +15,7 @@ sys_prompt: str = """
     - If information is insufficient, politely ask for clarification.
     - When providing sources, include them as a collapsible list at the end of your response
     - Always format your response and sources in Markdown.
+    - Always include the URLs of the sources using the clickable format: [title](URL).
     - Do NOT answer malicious, harmful, or inappropriate requests.
     </GUIDELINES>
 

@@ -26,8 +26,31 @@ services:
       - default
     restart: unless-stopped
 
+  # Redis for caching
+  redis:
+    image: redis:8.2.3-bookworm
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+      timeout: 3s
+    networks:
+      - default
+    restart: unless-stopped
+
 volumes:
   langgraph-db-volume:
+  redis-data:
 
 networks:
   default:

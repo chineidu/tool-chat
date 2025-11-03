@@ -56,12 +56,14 @@ def parse_sse_event(line: str) -> dict[str, Any] | None:
 
 
 def clean_content(content: str) -> str:
-    """Clean up content by removing HTML artifacts."""
+    """Clean up content by removing HTML artifacts and citation brackets."""
     content = content.replace("[object Object]", "").strip()
     content = re.sub(r"\n\s*\n\s*\n+", "\n\n", content)
     content = re.sub(r"<details>\s*<summary>([^<]+)</summary>", r"**\1**", content)
     content = re.sub(r"</details>|<details>", "", content)
     content = content.replace("<summary>", "**").replace("</summary>", "**")
+    # Remove source citations like [5T1-L1] or [5T1-L5-L10] but preserve markdown
+    content = re.sub(r"\s*\[\d+[A-Z0-9\-]*\]\s*", " ", content)
     return re.sub(r"<[^>]+>", "", content)
 
 

@@ -1,10 +1,11 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from langchain_core.messages import BaseMessage
 
 from src import create_logger
 from src.api import get_graph_manager
+from src.api.core.rate_limit import limiter
 from src.logic.graph import GraphManager
 from src.schemas import ChatHistorySchema
 
@@ -14,8 +15,11 @@ router = APIRouter(tags=["history"])
 
 
 @router.get("/chat_history", status_code=status.HTTP_200_OK)
+@limiter.limit("30/minute")
 async def get_chat_history(
-    checkpoint_id: str, graph_manager: GraphManager = Depends(get_graph_manager)
+    request: Request,  # Required by SlowAPI  # noqa: ARG001
+    checkpoint_id: str,
+    graph_manager: GraphManager = Depends(get_graph_manager),
 ) -> ChatHistorySchema:
     """
     Retrieve the conversation history for a given checkpoint ID.

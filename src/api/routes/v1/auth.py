@@ -1,17 +1,18 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from src import create_logger
-from src.api.auth.auth import (
+from src.api.core.auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     authenticate_user,
     create_access_token,
     get_current_active_user,
     get_password_hash,
 )
+from src.api.core.rate_limit import limiter
 from src.db.crud import (
     create_user,
     get_user_by_email,
@@ -26,7 +27,10 @@ router = APIRouter(tags=["auth"])
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-def register_user(user: UserCreateSchema, db: Session = Depends(get_db)) -> UserSchema:
+@limiter.limit("10/minute")
+def register_user(
+    request: Request, user: UserCreateSchema, db: Session = Depends(get_db)
+) -> UserSchema:  # noqa: ARG001
     """Register a new user.
 
     Checks that the provided username and email are unique, creates a new user
@@ -78,7 +82,9 @@ def register_user(user: UserCreateSchema, db: Session = Depends(get_db)) -> User
 
 
 @router.post("/token", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
 async def login_for_access_token(
+    request: Request,  # Required by SlowAPI  # noqa: ARG001
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
@@ -120,7 +126,9 @@ async def login_for_access_token(
 
 
 @router.get("/users/me", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
 async def get_current_user(
+    request: Request,  # Required by SlowAPI  # noqa: ARG001
     current_user: UserSchema = Depends(get_current_active_user),
 ) -> UserSchema:
     """

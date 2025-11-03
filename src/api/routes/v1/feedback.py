@@ -2,11 +2,12 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from src import create_logger
-from src.api.auth.auth import get_current_active_user
+from src.api.core.auth import get_current_active_user
+from src.api.core.rate_limit import limiter
 from src.db.crud import create_feedback
 from src.db.models import get_db
 from src.schemas import (
@@ -24,7 +25,9 @@ router = APIRouter(tags=["feedback"])
 
 
 @router.post("/feedback", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
 async def submit_feedback(
+    request: Request,  # Required by SlowAPI  # noqa: ARG001
     feedback_data: FeedbackRequestSchema,
     current_user: UserWithHashSchema = Depends(get_current_active_user),
     db: Session = Depends(get_db),

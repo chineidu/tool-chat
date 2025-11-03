@@ -2,11 +2,16 @@ import json
 from typing import Any, AsyncGenerator, LiteralString
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, HumanMessage
 
 from src.api import get_graph_manager
+from src.api.core.rate_limit import (
+    check_concurrent_limit,
+    decrement_concurrent_count,
+    limiter,
+)
 from src.logic.graph import GraphManager
 from src.schemas.types import Events
 
@@ -141,13 +146,32 @@ async def generate_chat_responses(
 
 
 @router.get("/chat_stream")
+@limiter.limit("5/minute")
 async def chat_stream(
+    request: Request,  # Required by SlowAPI  # noqa: ARG001
     message: str,
     graph_manager: GraphManager = Depends(get_graph_manager),
     checkpoint_id: str | None = None,
 ) -> StreamingResponse:
     """Endpoint to stream chat responses for a given message."""
+    # Check concurrent limit before starting stream
+    await check_concurrent_limit()
+
+    # Generator function to yield chat response chunks.
+    async def event_generator() -> AsyncGenerator[str | LiteralString, Any]:
+        """Generator function to yield chat response chunks."""
+        try:
+            async for chunk in generate_chat_responses(
+                message, graph_manager, checkpoint_id
+            ):
+                if await request.is_disconnected():
+                    break
+                yield chunk
+        finally:
+            # Decrement counter when stream ends
+            await decrement_concurrent_count()
+
     return StreamingResponse(
-        content=generate_chat_responses(message, graph_manager, checkpoint_id),
+        content=event_generator(),
         media_type="text/event-stream",
     )

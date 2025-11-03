@@ -1,10 +1,11 @@
 """Admin-only endpoints for role and user management."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from src import create_logger
-from src.api.auth.auth import get_current_admin_user
+from src.api.core.auth import get_current_admin_user
+from src.api.core.rate_limit import limiter
 from src.db.crud import (
     assign_role_to_user,
     create_role,
@@ -21,7 +22,9 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 @router.post("/roles", status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def create_new_role(
+    request: Request,  # Required by SlowAPI  # noqa: ARG001
     role: RoleSchema,
     current_admin: UserWithHashSchema = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
@@ -75,7 +78,9 @@ async def create_new_role(
 
 
 @router.post("/users/{username}/roles/{role_name}", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
 async def assign_role_to_user_endpoint(
+    request: Request,  # Required by SlowAPI  # noqa: ARG001
     username: str,
     role_name: str,
     current_admin: UserWithHashSchema = Depends(get_current_admin_user),
@@ -145,7 +150,9 @@ async def assign_role_to_user_endpoint(
 
 
 @router.delete("/users/{username}/roles/{role_name}", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
 async def remove_role_from_user(
+    request: Request,  # Required by SlowAPI  # noqa: ARG001
     username: str,
     role_name: str,
     current_admin: UserWithHashSchema = Depends(get_current_admin_user),
