@@ -11,6 +11,7 @@ from src.db.crud import (
     create_feedback,
     create_role,
     create_user,
+    get_all_roles,
     get_feedback_by_username,
     get_role_by_name,
     get_user_by_email,
@@ -435,3 +436,40 @@ class TestRoleCRUD:
         # Should still have only one role
         assert len(user.roles) == 1
         assert user.roles[0].name == "guest"
+
+    def test_get_all_roles(self, db_session: Session) -> None:
+        """Test getting all roles."""
+        # Given
+        # Create roles
+        # Roles have already been created by the `initialized_db` fixture.
+
+        # When
+        db_roles = get_all_roles(db_session)
+        if db_roles:
+            roles_list: list[str] = [
+                RoleSchema(
+                    id=role.id,
+                    name=role.name,
+                    description=role.description,
+                    created_at=role.created_at.isoformat(timespec="seconds"),
+                    updated_at=role.updated_at.isoformat(timespec="seconds")
+                    if role.updated_at
+                    else None,
+                )
+                for role in db_roles
+            ]
+
+        # Then
+        assert len(roles_list) == 3
+        assert roles_list[0].name == "admin"
+        assert roles_list[1].name == "user"
+        assert roles_list[2].name == "guest"
+        assert roles_list[0].description == "Administrator with full access"
+        assert roles_list[1].description == "Standard user with limited access"
+        assert roles_list[2].description == "Guest user with read-only access"
+        assert roles_list[0].created_at is not None
+        assert roles_list[1].created_at is not None
+        assert roles_list[2].created_at is not None
+        assert roles_list[0].updated_at is not None
+        assert roles_list[1].updated_at is not None
+        assert roles_list[2].updated_at is not None

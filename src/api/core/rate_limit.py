@@ -48,6 +48,7 @@ async def check_concurrent_limit() -> None:
                 status.HTTP_429_TOO_MANY_REQUESTS,
                 f"Too many concurrent streams (max {MAX_CONCURRENT})",
             ) from None
+
     except Exception:
         # Redis not available, use in-memory fallback
         async with _concurrent_lock:

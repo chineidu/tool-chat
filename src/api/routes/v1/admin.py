@@ -1,14 +1,18 @@
 """Admin-only endpoints for role and user management."""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from src import create_logger
 from src.api.core.auth import get_current_admin_user
+from src.api.core.cache import cached
 from src.api.core.rate_limit import limiter
 from src.db.crud import (
     assign_role_to_user,
     create_role,
+    get_all_roles,
     get_role_by_name,
     get_user_by_username,
 )
@@ -223,3 +227,31 @@ async def remove_role_from_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to remove role: {str(e)}",
         ) from e
+
+
+@router.get("/roles", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
+@cached(ttl=600, key_prefix="roles")  # type: ignore
+async def list_roles(
+    request: Request,  # Required by SlowAPI  # noqa: ARG001
+    current_admin: UserWithHashSchema = Depends(get_current_admin_user),  # noqa: ARG001
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """List all roles in the system. Admin access required."""
+    all_roles = get_all_roles(db=db)
+    if all_roles:
+        roles_list: list[RoleSchema] = [
+            RoleSchema(
+                id=role.id,
+                name=role.name,
+                description=role.description,
+                created_at=role.created_at.isoformat(timespec="seconds"),
+                updated_at=role.updated_at.isoformat(timespec="seconds")
+                if role.updated_at
+                else None,
+            )
+            for role in all_roles
+        ]
+        return {"roles": roles_list}
+
+    return {"roles": []}

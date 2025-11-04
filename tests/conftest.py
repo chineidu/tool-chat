@@ -173,7 +173,8 @@ def mock_astream_events() -> type[EventStreamFactory]:  # type: ignore
 
     def _builder(events: list[AIMessageChunk]) -> type[EventStreamFactory]:  # type: ignore
         async def _astream_events(
-            *args: Any, **kwargs: Any
+            *args: Any,
+            **kwargs: Any,  # noqa: ARG001
         ) -> AsyncGenerator[AIMessageChunk, None]:  # noqa: ARG001
             for event in events:
                 yield event
@@ -196,7 +197,8 @@ def mock_graph_manager() -> Generator[
         events: list[dict[str, Any]], target_app: FastAPI | None = None
     ) -> None:
         async def astream_events(
-            *args: Any, **kwargs: Any
+            *args: Any,
+            **kwargs: Any,  # noqa: ARG001
         ) -> AsyncGenerator[dict[str, Any], None]:  # noqa: ARG001
             for event in events:
                 yield event

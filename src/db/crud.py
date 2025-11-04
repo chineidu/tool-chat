@@ -5,7 +5,7 @@ Crud operations for the database.
 """
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import insert, select
 from sqlalchemy.orm import Session, selectinload
@@ -58,6 +58,12 @@ def get_role_by_name(db: Session, name: RoleType | str) -> DBRole | None:
         .where(DBRole.name == name)
     )
     return db.scalar(stmt)
+
+
+def get_all_roles(db: Session) -> list[DBRole] | None:
+    """Get all roles from the database."""
+    result = db.scalars(select(DBRole)).all()
+    return cast(list[DBRole], result)
 
 
 def convert_userdb_to_schema(db_user: DBUser) -> UserWithHashSchema | None:
