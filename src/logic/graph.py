@@ -2,11 +2,18 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.store.base import BaseStore
+from langgraph.store.postgres.aio import AsyncPostgresStore
 from langgraph.types import RetryPolicy
 
 from src import create_logger
 from src.config import app_settings
-from src.logic.nodes import llm_call_node, should_summarize, summarization_node
+from src.logic.nodes import (
+    llm_call_node,
+    should_summarize,
+    summarization_node,
+    update_memory,
+)
 from src.logic.state import State
 from src.logic.tools import date_and_time_tool, search_tool
 
@@ -27,6 +34,8 @@ class GraphManager:
         self.checkpointer: AsyncPostgresSaver | None = None
         self.checkpointer_context = None
         self.graph_instance: CompiledStateGraph | None = None
+        self.long_term_memory: BaseStore | None = None
+        self.long_term_memory_context = None
 
     async def initialize_checkpointer(self) -> None:
         """Initialize the Postgres checkpointer."""
@@ -34,6 +43,13 @@ class GraphManager:
             self.checkpointer_context = AsyncPostgresSaver.from_conn_string(DB_URI)
             self.checkpointer = await self.checkpointer_context.__aenter__()  # type: ignore
             await self.checkpointer.setup()
+
+    async def initialize_long_term_memory(self) -> None:
+        """Initialize long-term memory store."""
+        if self.long_term_memory is None:
+            self.long_term_memory_context = AsyncPostgresStore.from_conn_string(DB_URI)
+            self.long_term_memory = await self.long_term_memory_context.__aenter__()  # type: ignore
+            await self.long_term_memory.setup()
 
     async def cleanup_checkpointer(self) -> None:
         """Clean up the Postgres checkpointer."""
@@ -45,6 +61,20 @@ class GraphManager:
             finally:
                 self.checkpointer = None
                 self.checkpointer_context = None
+
+    async def cleanup_long_term_memory(self) -> None:
+        """Clean up the long-term memory store."""
+        if (
+            self.long_term_memory_context is not None
+            and self.long_term_memory is not None
+        ):
+            try:
+                await self.long_term_memory_context.__aexit__(None, None, None)
+            except Exception as e:
+                logger.error(f"Error cleaning up long-term memory: {e}")
+            finally:
+                self.long_term_memory = None
+                self.long_term_memory_context = None
 
     async def build_graph(self) -> CompiledStateGraph:
         """
@@ -64,6 +94,9 @@ class GraphManager:
         # Ensure checkpointer is initialized
         if self.checkpointer is None:
             await self.initialize_checkpointer()
+        # Ensure long-term memory is initialized
+        if self.long_term_memory is None:
+            await self.initialize_long_term_memory()
 
         builder: StateGraph = StateGraph(State)
 
@@ -85,6 +118,11 @@ class GraphManager:
             summarization_node,
             retry_policy=RetryPolicy(max_attempts=MAX_ATTEMPTS, initial_interval=1.0),
         )
+        builder.add_node(
+            "update_memory",
+            update_memory,
+            retry_policy=RetryPolicy(max_attempts=MAX_ATTEMPTS, initial_interval=1.0),
+        )
 
         # Add edges
         builder.add_edge(START, "llm_call")
@@ -95,9 +133,14 @@ class GraphManager:
             "llm_call", should_summarize, {"summarize": "summarize", END: END}
         )
         builder.add_edge("tools", "llm_call")
+        builder.add_edge("llm_call", "update_memory")
 
         # Compile the graph with persistent Postgres checkpointer
-        self.graph_instance = builder.compile(checkpointer=self.checkpointer)
-        logger.info("Graph instance built and compiled with Postgres checkpointer.")
+        self.graph_instance = builder.compile(
+            checkpointer=self.checkpointer, store=self.long_term_memory
+        )
+        logger.info(
+            "Graph instance built and compiled with Postgres checkpointer and long-term memory."
+        )
 
         return self.graph_instance

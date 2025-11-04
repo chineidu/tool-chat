@@ -23,6 +23,9 @@ SECRET_KEY: str = app_settings.SECRET_KEY.get_secret_value()
 ALGORITHM: str = app_settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES: int = app_settings.ACCESS_TOKEN_EXPIRE_MINUTES
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{auth_prefix}/token")
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl=f"{auth_prefix}/token", auto_error=False
+)
 
 # =========== Password hashing context ===========
 # Using `scrypt` instead of `bcrypt` to avoid compatibility issues on macOS
@@ -53,7 +56,7 @@ def create_access_token(
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
-) -> UserWithHashSchema | None:
+) -> UserWithHashSchema:
     """Get the current user from the JWT token."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -73,7 +76,15 @@ async def get_current_user(
     db_user = get_user_by_username(db=db, username=username)
     if db_user is None:
         raise credentials_exception
-    return convert_userdb_to_schema(db_user)
+
+    user_schema = convert_userdb_to_schema(db_user)
+    if user_schema is None:
+        raise credentials_exception
+
+    if not user_schema.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+
+    return user_schema
 
 
 def authenticate_user(db: Session, username: str, password: str) -> DBUser | None:

@@ -72,6 +72,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
             except Exception as e:
                 logger.error(f"Error cleaning up checkpointer: {e}")
 
+            try:
+                await app.state.graph_manager.cleanup_long_term_memory()
+                logger.info("Long-term memory store cleaned up during shutdown")
+            except Exception as e:
+                logger.error(f"Error cleaning up long-term memory: {e}")
+
         if hasattr(app.state, "cache"):
             # Cache will be automatically garbage collected
             try:

@@ -36,7 +36,7 @@ def setup_cache() -> Cache:
     db: int = app_settings.REDIS_DB
 
     try:
-        # Try to create Redis cache
+        # Create Redis cache
         cache_kwargs: dict[str, Any] = {
             "endpoint": app_settings.REDIS_HOST,
             "port": app_settings.REDIS_PORT,
@@ -65,11 +65,13 @@ def cached(
     """
     Decorator for caching endpoint responses.
 
-    Args:
+    Parameters
+    ----------
         ttl: Time to live in seconds (default 5 minutes)
         key_prefix: Prefix for cache key (useful for namespacing)
 
-    Usage:
+    Usage
+    -----
         @cached(ttl=60, key_prefix="products")
         async def get_products():
             ...
@@ -89,13 +91,14 @@ def cached(
             # Generate cache key from endpoint path and query params
             if request is None:
                 raise ValueError("Request object is required for caching")
-            cache_key = generate_cache_key(
+            cache_key: str = generate_cache_key(
                 request.url.path, dict(request.query_params), key_prefix
             )
 
             # Try to get from cache
             cached_response = await cache.get(cache_key)
             if cached_response is not None:
+                logger.info(f"Cache hit for key: {cache_key}")
                 return cached_response
 
             # Cache miss - call the actual function
@@ -116,11 +119,11 @@ def generate_cache_key(path: str, params: dict[str, Any], prefix: str = "") -> s
     Generate a unique cache key from path and parameters.
     """
     # Create a deterministic string from params
-    params_str = json.dumps(params, sort_keys=True)
-    key_content = f"{path}:{params_str}"
+    params_str: str = json.dumps(params, sort_keys=True)
+    key_content: str = f"{path}:{params_str}"
 
     # Hash for shorter keys
-    key_hash = hashlib.md5(key_content.encode()).hexdigest()
+    key_hash: str = hashlib.md5(key_content.encode()).hexdigest()
 
     if prefix:
         return f"{prefix}:{key_hash}"

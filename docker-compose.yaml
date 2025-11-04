@@ -33,12 +33,12 @@ services:
       - "6379:6379"
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-    command: >
-      redis-server
-      --appendonly yes
-      --requirepass ${REDIS_PASSWORD:-}
+    command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - redis-data:/data
+      # Custom Redis configuration
+      - ./docker/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    # volumes moved above
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

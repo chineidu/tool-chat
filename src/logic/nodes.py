@@ -7,8 +7,10 @@ from langchain_core.messages import (
     HumanMessage,
     SystemMessage,
 )
+from langchain_core.runnables.config import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END
+from langgraph.store.base import BaseStore
 
 from src import create_logger
 from src.config import app_config, app_settings
@@ -17,6 +19,7 @@ from src.logic.prompts import (
     query_prompt,
     summary_prompt,
     sys_prompt,
+    update_user_memory_prompt,
 )
 from src.logic.state import State
 from src.logic.tools import date_and_time_tool, search_tool
@@ -70,15 +73,36 @@ summarization_llm = ChatOpenAI(
 ).bind(max_tokens=MAX_SUMMARY_TOKENS)
 
 
-async def llm_call_node(state: State) -> State:
+async def llm_call_node(
+    state: State, config: RunnableConfig, store: BaseStore
+) -> State:  # noqa: ARG001
     """Node to call the LLM with tools and conversation history."""
     summary: str = state.get("summary", "")
-    sys_msg = SystemMessage(content=sys_prompt)
+
+    # ========================================================
+    # ============== Process Long-term Memory ================
+    # ========================================================
+    user_id: str = config["configurable"]["user_id"]
+
+    # Retrieve memory from the store
+    namespace: tuple[str, str] = ("memory", user_id)
+    key: str = "user_details"
+    user_details = await store.aget(namespace, key)
+
+    # Extract memory if it exists
+    if user_details:
+        user_details_content = user_details.value.get("memory")
+    else:
+        user_details_content = "No memory found."
+
+    sys_msg_prompt: str = sys_prompt.format(user_details_content=user_details_content)
+
+    sys_msg = SystemMessage(content=sys_msg_prompt)
 
     if summary:
         summary_msg = SystemMessage(content=f"Summary of conversation:\n\n {summary}")
         # Summary + most recent messages
-        msgs_with_summary = [summary_msg] + state["messages"]
+        msgs_with_summary: list[AnyMessage] = [summary_msg] + state["messages"]
 
     else:
         msgs_with_summary = state["messages"]
@@ -122,6 +146,42 @@ async def summarization_node(state: State) -> State:
         answer=state.get("answer", None),  # type: ignore
         messages=messages_to_remove,  # type: ignore
         summary=response.content,  # type: ignore
+    )
+
+
+async def update_memory(
+    state: State, config: RunnableConfig, store: BaseStore
+) -> State:
+    """Update user memory based on the conversation."""
+    user_id: str = config["configurable"]["user_id"]
+
+    # Retrieve existing memory from the store
+    namespace: tuple[str, str] = ("memory", user_id)
+    key: str = "user_details"
+    user_details = await store.aget(namespace, key)
+
+    # Extract memory if it exists
+    if user_details:
+        user_details_content = user_details.value.get("memory")
+    else:
+        user_details_content = "No memory found."
+
+    sys_msg = update_user_memory_prompt.format(
+        user_details_content=user_details_content
+    )
+
+    # Call the LLM to update memory
+    new_memory = await llm.ainvoke([SystemMessage(content=sys_msg)] + state["messages"])
+
+    # If new memory is provided, update the store
+    if new_memory.content.strip():  # type: ignore
+        await store.aput(namespace, key, value={"memory": new_memory.content})
+
+    return State(
+        messages=state["messages"],
+        query=state["query"],
+        answer=state["answer"],
+        summary=state["summary"],
     )
 
 

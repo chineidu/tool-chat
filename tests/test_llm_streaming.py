@@ -7,7 +7,11 @@ from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage, AIMessageChunk
+from sqlalchemy.orm.session import Session
 
+from src.api.core.auth import create_access_token
+from src.db.crud import create_user
+from src.schemas import UserWithHashSchema
 from src.schemas.types import Events
 
 
@@ -17,10 +21,27 @@ class TestLLMStreaming:
     def test_content_is_streamed_successfully(
         self,
         client: TestClient,
+        db_session: Session,
         parse_sse_event: Callable[[str], list[dict[str, Any]]],
         mock_graph_manager: Callable[[list[dict[str, Any]], Any | None], None],
     ) -> None:
         """Test that content is streamed successfully from the /chat_stream endpoint."""
+        # Create a test user in the database
+        test_user = UserWithHashSchema(
+            id=1,
+            username="testuser",
+            firstname="Test",
+            lastname="User",
+            email="test@example.com",
+            hashed_password="hashed",
+            is_active=True,
+            roles=["user"],
+        )
+        create_user(db=db_session, user=test_user)
+
+        # Create a JWT token for authentication
+        token = create_access_token({"sub": "testuser"})
+
         events: list[dict[str, Any]] = [
             {
                 "event": "on_chat_model_stream",
@@ -34,9 +55,10 @@ class TestLLMStreaming:
         ]
         mock_graph_manager(events, client.app)
 
-        # Call the endpoint
+        # Call the endpoint with authentication
+        headers = {"Authorization": f"Bearer {token}"}
         with client.stream(
-            "GET", "/api/v1/chat_stream", params={"message": "hi"}
+            "GET", "/api/v1/chat_stream", params={"message": "hi"}, headers=headers
         ) as resp:
             content_lines = [
                 line.decode("utf-8") if isinstance(line, bytes) else line
@@ -52,10 +74,27 @@ class TestLLMStreaming:
     def test_tool_call_successfully(
         self,
         client: TestClient,
+        db_session: Session,
         parse_sse_event: Callable[[str], list[dict[str, Any]]],
         mock_graph_manager: Callable[[list[dict[str, Any]], Any | None], None],
     ) -> None:
-        """Test that content is streamed successfully from the /chat_stream endpoint."""
+        """Test that tool calls are handled successfully from the /chat_stream endpoint."""
+        # Create a test user in the database
+        test_user = UserWithHashSchema(
+            id=1,
+            username="testuser",
+            firstname="Test",
+            lastname="User",
+            email="test@example.com",
+            hashed_password="hashed",
+            is_active=True,
+            roles=["user"],
+        )
+        create_user(db=db_session, user=test_user)
+
+        # Create a JWT token for authentication
+        token = create_access_token({"sub": "testuser"})
+
         events: list[dict[str, Any]] = [
             {
                 "event": "on_chat_model_end",
@@ -95,15 +134,20 @@ class TestLLMStreaming:
         ]
         mock_graph_manager(events, client.app)
 
-        # Call the endpoint
+        # Call the endpoint with authentication
+        headers = {"Authorization": f"Bearer {token}"}
         with client.stream(
-            "GET", "/api/v1/chat_stream", params={"message": "hi"}
+            "GET", "/api/v1/chat_stream", params={"message": "hi"}, headers=headers
         ) as resp:
+            print(f"Response status: {resp.status_code}")
+            if resp.status_code != 200:
+                print(f"Response text: {resp.text}")
             content_lines: list[str] = [
                 line.decode("utf-8") if isinstance(line, bytes) else line
                 for line in resp.iter_lines()
             ]
             raw_content = "\n".join(content_lines)
+            print(f"Raw content: {raw_content}")
             received: list[dict[str, Any]] = parse_sse_event(raw_content)
 
         # Assert

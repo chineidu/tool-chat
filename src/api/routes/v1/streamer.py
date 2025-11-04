@@ -7,12 +7,14 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, HumanMessage
 
 from src.api import get_graph_manager
+from src.api.core.auth import get_current_user
 from src.api.core.rate_limit import (
     check_concurrent_limit,
     decrement_concurrent_count,
     limiter,
 )
 from src.logic.graph import GraphManager
+from src.schemas import UserWithHashSchema
 from src.schemas.types import Events
 
 router = APIRouter(tags=["streamer"])
@@ -30,7 +32,10 @@ def serialise_ai_message_chunk(
 
 
 async def generate_chat_responses(
-    message: str, graph_manager: GraphManager, checkpoint_id: str | None = None
+    message: str,
+    graph_manager: GraphManager,
+    user_id: str,
+    checkpoint_id: str | None = None,
 ) -> AsyncGenerator[str | LiteralString, Any]:
     """Generate chat responses as a stream of Server-Sent Events (SSE)."""
 
@@ -46,7 +51,7 @@ async def generate_chat_responses(
         new_checkpoint_id: str = str(uuid4())
 
         config: dict[str, dict[str, str]] = {
-            "configurable": {"thread_id": new_checkpoint_id}
+            "configurable": {"thread_id": new_checkpoint_id, "user_id": user_id}  # type: ignore
         }
 
         # Initialize with first message
@@ -61,7 +66,7 @@ async def generate_chat_responses(
 
     else:
         config = {
-            "configurable": {"thread_id": checkpoint_id}  # type: ignore
+            "configurable": {"thread_id": checkpoint_id, "user_id": user_id}  # type: ignore
         }
         # Continue existing conversation
         events = graph.astream_events(
@@ -151,18 +156,22 @@ async def chat_stream(
     request: Request,  # Required by SlowAPI  # noqa: ARG001
     message: str,
     graph_manager: GraphManager = Depends(get_graph_manager),
+    current_user: UserWithHashSchema = Depends(get_current_user),
     checkpoint_id: str | None = None,
 ) -> StreamingResponse:
     """Endpoint to stream chat responses for a given message."""
     # Check concurrent limit before starting stream
     await check_concurrent_limit()
 
+    # Extract user_id from authenticated user
+    user_id = str(current_user.id)
+
     # Generator function to yield chat response chunks.
     async def event_generator() -> AsyncGenerator[str | LiteralString, Any]:
         """Generator function to yield chat response chunks."""
         try:
             async for chunk in generate_chat_responses(
-                message, graph_manager, checkpoint_id
+                message, graph_manager, user_id, checkpoint_id
             ):
                 if await request.is_disconnected():
                     break
