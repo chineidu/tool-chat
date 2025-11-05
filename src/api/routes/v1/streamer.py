@@ -5,8 +5,9 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, HumanMessage
+from langfuse.langchain import CallbackHandler
 
-from src.api import get_graph_manager
+from src.api import get_graph_manager, get_langfuse_handler
 from src.api.core.auth import get_current_user
 from src.api.core.rate_limit import (
     check_concurrent_limit,
@@ -14,6 +15,7 @@ from src.api.core.rate_limit import (
     limiter,
 )
 from src.logic.graph import GraphManager
+from src.logic.state import State
 from src.schemas import UserWithHashSchema
 from src.schemas.types import Events
 
@@ -36,6 +38,7 @@ async def generate_chat_responses(
     graph_manager: GraphManager,
     user_id: str,
     checkpoint_id: str | None = None,
+    langfuse_handler: CallbackHandler | None = None,
 ) -> AsyncGenerator[str | LiteralString, Any]:
     """Generate chat responses as a stream of Server-Sent Events (SSE)."""
 
@@ -45,32 +48,39 @@ async def generate_chat_responses(
     # ==========================================================
 
     is_new_conversation: bool = checkpoint_id is None
+    callbacks = [langfuse_handler] if langfuse_handler else []
 
     if is_new_conversation:
         # Generate new checkpoint ID for first message in conversation
         new_checkpoint_id: str = str(uuid4())
 
-        config: dict[str, dict[str, str]] = {
-            "configurable": {"thread_id": new_checkpoint_id, "user_id": user_id}  # type: ignore
+        config: dict[str, dict[str, str]] = {  # type: ignore
+            "configurable": {"thread_id": new_checkpoint_id, "user_id": user_id},  # type: ignore
+            "callbacks": callbacks,  # type: ignore
         }
 
         # Initialize with first message
+        input_ = State(query=[HumanMessage(content=message)])  # type: ignore
         events = graph.astream_events(
-            {"messages": [HumanMessage(content=message)]},
+            # {"query": [HumanMessage(content=message)]},
+            input_,
             version="v2",
             config=config,  # type: ignore
         )
 
-        # First send the checkpoint ID
+        # Send the checkpoint ID
         yield f"data: {json.dumps({'type': Events.CHECKPOINT, 'checkpoint_id': new_checkpoint_id})}\n\n"
 
     else:
         config = {
-            "configurable": {"thread_id": checkpoint_id, "user_id": user_id}  # type: ignore
+            "configurable": {"thread_id": checkpoint_id, "user_id": user_id},  # type: ignore
+            "callbacks": callbacks,  # type: ignore
         }
         # Continue existing conversation
         events = graph.astream_events(
-            {"messages": [HumanMessage(content=message)]},
+            {
+                "query": [HumanMessage(content=message)]
+            },  # Use same input format as new conversation
             version="v2",
             config=config,  # type: ignore
         )
@@ -137,10 +147,10 @@ async def generate_chat_responses(
         # Handle date_and_time_tool completions
         elif event_type == "on_tool_end" and event["name"] == "date_and_time_tool":
             output = event["data"]["output"]  # type: ignore
-            date_str: str = output.content
-            _date: str = date_str.split("T")[0]
-            _time: str = date_str.split("T")[1]
-            formatted_date = f"{_date} {_time}"
+            # The tool returns a formatted string, use it directly
+            formatted_date = (
+                output.content if hasattr(output, "content") else str(output)
+            )
             payload = {"type": Events.DATE_RESULT, "result": formatted_date}
             yield f"data: {json.dumps(payload)}\n\n"
 
@@ -157,6 +167,7 @@ async def chat_stream(
     message: str,
     graph_manager: GraphManager = Depends(get_graph_manager),
     current_user: UserWithHashSchema = Depends(get_current_user),
+    langfuse_handler: CallbackHandler = Depends(get_langfuse_handler),
     checkpoint_id: str | None = None,
 ) -> StreamingResponse:
     """Endpoint to stream chat responses for a given message."""
@@ -171,7 +182,7 @@ async def chat_stream(
         """Generator function to yield chat response chunks."""
         try:
             async for chunk in generate_chat_responses(
-                message, graph_manager, user_id, checkpoint_id
+                message, graph_manager, user_id, checkpoint_id, langfuse_handler
             ):
                 if await request.is_disconnected():
                     break

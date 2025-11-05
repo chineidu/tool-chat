@@ -1,10 +1,12 @@
 from enum import Enum
 
+from pydantic import BaseModel
+
 
 class OpenRouterModels(str, Enum):
     """OpenRouter LLMs."""
 
-    GEMINI_2_0_FLASH_001 = "google/gemini-2.0-flash-001"
+    GEMINI_2_0_FLASH_LITE = "google/gemini-2.5-flash-lite"
     GEMINI_2_5_FLASH = "google/gemini-2.5-flash"
     GPT_OSS_120B = "openai/gpt-oss-120b"
     GPT_OSS_20B = "openai/gpt-oss-20b"
@@ -63,3 +65,6 @@ class RoleType(str, Enum):
     ADMIN = "admin"
     USER = "user"
     GUEST = "guest"
+
+
+type PydanticModel = type[BaseModel]

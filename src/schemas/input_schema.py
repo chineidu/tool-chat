@@ -134,7 +134,9 @@ class UserCreateSchema(UserSchema):
             }
         }
     )
-    password: SecretStr = Field(..., description="User's password")
+    password: SecretStr = Field(
+        ..., description="User's password", min_length=8, max_length=128
+    )
 
 
 class RoleSchema(BaseSchema):

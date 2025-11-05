@@ -111,7 +111,7 @@ class Settings(BaseSettingsConfig):
     # LANGFUSE
     LANGFUSE_SECRET_KEY: SecretStr = SecretStr("your_langfuse_secret_key")
     LANGFUSE_PUBLIC_KEY: SecretStr = SecretStr("your_langfuse_public_key")
-    LANGFUSE_HOST: str = "https://cloud.langfuse.com"
+    LANGFUSE_BASE_URL: str = "https://cloud.langfuse.com"
 
     # ===== API AUTHENTICATION =====
     SECRET_KEY: SecretStr = SecretStr("your_secret_key")

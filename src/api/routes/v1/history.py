@@ -18,7 +18,7 @@ router = APIRouter(tags=["history"])
 
 @router.get("/chat_history", status_code=status.HTTP_200_OK)
 @limiter.limit("30/minute")
-@cached(ttl=600, key_prefix="chat_history")  # type: ignore
+@cached(ttl=60, key_prefix="chat_history")  # type: ignore
 async def get_chat_history(
     request: Request,  # Required by SlowAPI  # noqa: ARG001
     checkpoint_id: str,

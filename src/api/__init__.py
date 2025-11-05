@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 
 from aiocache import Cache
 from fastapi import FastAPI, HTTPException, Request, status
+from langfuse.langchain import CallbackHandler
 
 from src import create_logger
 from src.api.core.cache import setup_cache
@@ -43,6 +44,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
         await app.state.graph_manager.initialize_checkpointer()
         logger.info("GraphManager initialized with Postgres checkpointer")
 
+        # Initialize Langfuse callback handler
+        app.state.langfuse_handler = CallbackHandler()
+
         # Initialize cache
         app.state.cache = setup_cache()
         logger.info("Cache initialized")
@@ -58,6 +62,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
         # Yield control to the application
         yield
 
+    # Cleanup and shutdown
     except Exception as e:
         logger.error(f"Failed to load model during startup: {e}")
         raise
@@ -77,6 +82,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
                 logger.info("Long-term memory store cleaned up during shutdown")
             except Exception as e:
                 logger.error(f"Error cleaning up long-term memory: {e}")
+
+        # Cleanup Langfuse handler
+        if hasattr(app.state, "langfuse_handler"):
+            try:
+                app.state.langfuse_handler = None  # type: ignore
+                logger.info("Langfuse handler closed during shutdown")
+            except Exception as e:
+                logger.error(f"Error closing Langfuse handler: {e}")
 
         if hasattr(app.state, "cache"):
             # Cache will be automatically garbage collected
@@ -106,3 +119,16 @@ def get_graph_manager(request: Request) -> GraphManager:
 async def get_cache(request: Request) -> Cache:
     """Dependency to inject cache into endpoints."""
     return request.app.state.cache
+
+
+def get_langfuse_handler(request: Request) -> CallbackHandler:
+    """Get the Langfuse CallbackHandler from the app state."""
+    if (
+        not hasattr(request.app.state, "langfuse_handler")
+        or request.app.state.langfuse_handler is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Langfuse handler not loaded. Please try again later.",
+        )
+    return request.app.state.langfuse_handler

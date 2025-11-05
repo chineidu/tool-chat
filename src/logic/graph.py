@@ -12,7 +12,7 @@ from src.logic.nodes import (
     llm_call_node,
     should_summarize,
     summarization_node,
-    update_memory,
+    update_memory_node,
 )
 from src.logic.state import State
 from src.logic.tools import date_and_time_tool, search_tool
@@ -120,20 +120,20 @@ class GraphManager:
         )
         builder.add_node(
             "update_memory",
-            update_memory,
+            update_memory_node,
             retry_policy=RetryPolicy(max_attempts=MAX_ATTEMPTS, initial_interval=1.0),
         )
 
         # Add edges
         builder.add_edge(START, "llm_call")
         builder.add_conditional_edges(
-            "llm_call", tools_condition, {"tools": "tools", END: END}
+            "llm_call", tools_condition, {"tools": "tools", END: "update_memory"}
         )
         builder.add_conditional_edges(
-            "llm_call", should_summarize, {"summarize": "summarize", END: END}
+            "update_memory", should_summarize, {"summarize": "summarize", END: END}
         )
         builder.add_edge("tools", "llm_call")
-        builder.add_edge("llm_call", "update_memory")
+        builder.add_edge("summarize", END)
 
         # Compile the graph with persistent Postgres checkpointer
         self.graph_instance = builder.compile(

@@ -32,4 +32,4 @@ def get_model_name(
         logger.warning(
             f"Model not found for type {model_provider} and name {model_name}: {e}"
         )
-        return OpenRouterModels.GEMINI_2_0_FLASH_001
+        return OpenRouterModels.GEMINI_2_0_FLASH_001  # type: ignore

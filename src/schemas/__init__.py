@@ -10,6 +10,7 @@ from src.schemas.output_schema import (
     ChatHistorySchema,
     FeedbackResponseSchema,
     HealthStatusSchema,
+    StructuredMemoryResponse,
 )
 
 __all__: list[str] = [
@@ -19,6 +20,7 @@ __all__: list[str] = [
     "FeedbackResponseSchema",
     "HealthStatusSchema",
     "RoleSchema",
+    "StructuredMemoryResponse",
     "UserCreateSchema",
     "UserSchema",
     "UserWithHashSchema",

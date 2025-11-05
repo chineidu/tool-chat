@@ -3,7 +3,6 @@
 import asyncio
 import json
 import re
-import time
 from collections import Counter
 from typing import Any
 
@@ -104,7 +103,7 @@ async def send_feedback_to_api(message_index: int, feedback_type: str | None) ->
         if st.session_state.access_token:
             headers["Authorization"] = f"Bearer {st.session_state.access_token}"
 
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 FEEDBACK_ENDPOINT, json=payload, headers=headers
             )
@@ -242,17 +241,24 @@ def render_feedback_buttons(message_index: int) -> None:
             st.rerun()
             return
 
-    # Animation handler: if anim_state is set, wait 0.5s then set feedback and clear anim
+    # Animation handler: if anim_state is set, immediately set feedback and clear anim
     if anim_state in ("positive", "negative"):
-        time.sleep(0.01)
+        # Remove the sleep that can cause rendering issues
         if anim_state == "positive":
             st.session_state.feedback[feedback_key] = FeedbackType.POSITIVE
         else:
             st.session_state.feedback[feedback_key] = FeedbackType.NEGATIVE
         st.session_state[anim_key] = None
-        asyncio.run(
-            send_feedback_to_api(message_index, st.session_state.feedback[feedback_key])
-        )
+
+        # Send feedback asynchronously without blocking
+        try:
+            asyncio.run(
+                send_feedback_to_api(
+                    message_index, st.session_state.feedback[feedback_key]
+                )
+            )
+        except Exception as e:
+            st.error(f"Failed to send feedback: {str(e)}")
         st.rerun()
 
 
@@ -295,7 +301,7 @@ async def stream_chat_response(message: str, checkpoint_id: str | None = None) -
         sources: list[str] = []
 
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 async with client.stream(
                     "GET", CHAT_STREAM_ENDPOINT, params=params, headers=headers
                 ) as response:
@@ -330,10 +336,12 @@ async def stream_chat_response(message: str, checkpoint_id: str | None = None) -
                             status_container.info(f"📅 {event.get('result', '')}")
 
                         elif event_type == Events.CONTENT:
-                            full_response += event.get("content", "")
-                            message_placeholder.markdown(
-                                clean_content(full_response) + " ▌"
-                            )
+                            content_chunk = event.get("content", "")
+                            if content_chunk:  # Only update if there's actual content
+                                full_response += content_chunk
+                                message_placeholder.markdown(
+                                    clean_content(full_response) + " ▌"
+                                )
 
                         elif event_type == Events.COMPLETION_END:
                             status_container.empty()
@@ -344,22 +352,45 @@ async def stream_chat_response(message: str, checkpoint_id: str | None = None) -
                                     render_sources(sources)
                             break
 
+                    # Ensure we always clear status and finalize response
+                    status_container.empty()
+                    if full_response:
+                        message_placeholder.markdown(clean_content(full_response))
+                    elif not full_response.strip():
+                        # Handle case where no content was received
+                        message_placeholder.info(
+                            "🤔 I didn't receive any content. Please try asking again."
+                        )
+                        # Add fallback message to session state
+                        fallback_content = "I didn't receive a proper response. Please try asking again."
+                        full_response = fallback_content
+
         except httpx.HTTPError as e:
-            st.error(f"❌ Connection Error: {str(e)}")
+            status_container.empty()
+            message_placeholder.error(f"❌ Connection Error: {str(e)}")
             st.info("💡 Make sure the FastAPI server is running")
+            # Set error content for later handling
+            full_response = f"❌ Connection Error: {str(e)}"
             return
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
+            status_container.empty()
+            message_placeholder.error(f"❌ Error: {str(e)}")
+            # Set error content for later handling
+            full_response = f"❌ Error: {str(e)}"
             return
 
-    st.session_state.messages.append(
-        {
-            "role": "assistant",
-            "content": full_response,
-            "sources": sources if sources else None,
-        }
-    )
-    st.session_state.message_count += 1
+        # Add to session state (feedback buttons will be rendered when displaying messages)
+        if full_response.strip():
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": full_response,
+                    "sources": sources if sources else None,
+                }
+            )
+            st.session_state.message_count += 1
+            # Trigger rerun to display feedback buttons
+            st.rerun()
 
 
 async def authenticate_user(username: str, password: str) -> bool:
@@ -954,13 +985,13 @@ def main() -> None:
                         go.Pie(
                             labels=labels,
                             values=values,
-                            marker=dict(colors=colors),
+                            marker={"colors": colors},
                             hole=0.5,
                         )
                     ]
                 )
                 fig.update_layout(
-                    margin=dict(l=0, r=0, t=0, b=0), showlegend=True, height=200
+                    margin={"l": 0, "r": 0, "t": 0, "b": 0}, showlegend=True, height=200
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -994,8 +1025,13 @@ def main() -> None:
             "👋 Welcome! Ask me anything - I can search the web and provide detailed answers."
         )
     else:
-        for idx, msg in enumerate(st.session_state.messages):
-            message_index = idx if msg["role"] == "assistant" else None
+        assistant_count = 0
+        for msg in st.session_state.messages:
+            if msg["role"] == "assistant":
+                message_index = assistant_count
+                assistant_count += 1
+            else:
+                message_index = None
             render_message(
                 msg["role"], msg["content"], msg.get("sources"), message_index
             )
@@ -1003,7 +1039,6 @@ def main() -> None:
     # Chat input
     if prompt := st.chat_input("💬 Type your message here..."):
         asyncio.run(stream_chat_response(prompt, st.session_state.checkpoint_id))
-        st.rerun()
 
 
 if __name__ == "__main__":
