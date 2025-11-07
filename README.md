@@ -46,9 +46,9 @@ An intelligent conversational AI application powered by LangGraph with advanced 
     - [Development Guidelines](#development-guidelines)
   - [License](#license)
   - [Contact](#contact)
-    - [Built with using LangGraph, FastAPI, and Streamlit](#built-with-using-langgraph-fastapi-and-streamlit)
 
 <!-- /TOC -->
+
 ## Overview
 
 Tool Chat is a production-ready conversational AI system that combines the power of LangGraph for orchestrating complex agent workflows with a modern web stack. It features a FastAPI backend for efficient API handling and a Streamlit frontend for an intuitive user experience. The application includes persistent conversation memory, real-time web search integration, and comprehensive user management.
@@ -220,52 +220,57 @@ The LangGraph workflow consists of:
 ### Prerequisites
 
 - Python 3.13+
+- uv (uv package manager) — used by Makefile for dependency management and running modules (`uv sync` / `uv run`)
 - Docker & Docker Compose
 - OpenAI API key
 - Tavily API key (for web search)
+- Note: pyproject.toml currently lists both `psycopg-binary` and `psycopg2-binary`; prefer keeping only one adapter to avoid confusion or accidental mismatched drivers.
 
 ### Installation
 
 1. **Clone the repository**
 
-   ```bash
-   git clone https://github.com/chineidu/tool-chat.git
-   cd tool-chat
-   ```
+```bash
+git clone https://github.com/chineidu/tool-chat.git
+cd tool-chat
+```
 
-2. **Install dependencies**
+1. **Install dependencies**
 
-   ```bash
-   make install
-   # or
-   uv sync
-   ```
+```bash
+make install
+# or
+uv sync
+```
 
-3. **Set up environment variables**
+1. **Set up environment variables**
 
-   ```bash
-   cp .env.example .env
-   # Edit .env with your API keys and configuration
-   ```
+```bash
+cp .env.example .env
+# Edit .env with your API keys and configuration
+# NOTE: Settings load is strict (populate_by_name=True, strict=True). Missing/invalid env vars can raise errors — fill .env before starting services.
+```
 
-4. **Start infrastructure services**
+1. **Start infrastructure services**
 
-   ```bash
-   make up
-   # Starts PostgreSQL and Redis via Docker Compose
-   ```
+```bash
+make up
+# Starts PostgreSQL and Redis via Docker Compose
+# The Postgres container runs ./docker/init-databases.sh which creates a separate API DB (API_DB_NAME, default "user_feedback_db").
+# Ensure POSTGRES_USER/POSTGRES_PASSWORD (and API_DB_NAME if changed) are set in .env so the init script can create the DB as expected.
+```
 
-5. **Run database migrations**
+1. **Run database migrations**
 
-   ```bash
-   uv run alembic upgrade head
-   ```
+```bash
+uv run alembic upgrade head
+```
 
-6. **Create admin user (optional)**
+1. **Create admin user (optional)**
 
-   ```bash
-   uv run python scripts/create_admin.py
-   ```
+```bash
+uv run -m scripts.create_admin --username admin --email admin@example.com --password mypassword
+```
 
 ### Running the Application
 
@@ -363,6 +368,7 @@ Once the API server is running, access:
 - Update documentation as needed
 - Use type hints for better code clarity
 - Run `make lint` and `make format` before committing
+- Note: pre-commit is configured to run `ruff` with `--fix` and `mypy` (see `.pre-commit-config.yaml`); mypy is configured to ignore missing imports and excludes `tests/` and `alembic/`.
 
 ## License
 
@@ -374,4 +380,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-### Built with using LangGraph, FastAPI, and Streamlit
+**Built with:** LangGraph, FastAPI, and Streamlit
